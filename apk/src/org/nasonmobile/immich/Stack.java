@@ -772,10 +772,12 @@ final class Stack {
         }
     }
 
+    /** comando leggibile per i log e la diagnosi, senza la password del database (i log si incollano nelle segnalazioni) */
     private static String join(List<String> l) {
         StringBuilder sb = new StringBuilder();
         for (String s : l) {
             if (sb.length() > 0) sb.append(' ');
+            s = s.replaceAll("PASSWORD '[^']*'", "PASSWORD '***'");
             sb.append(s.length() > 160 ? s.substring(0, 160) + "…" : s);
         }
         return sb.toString();
