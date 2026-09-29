@@ -126,6 +126,11 @@ jobs:
             without losing photos or database (same signature); on its first start the server updates itself.
           - **immich-server-lite.apk** + **$(basename "$pack")**: small APK, the package is copied with adb (see README).
 
+          **To get your photos into Google Photos** (Pixel 1–5): in the app turn on *Keep the originals in DCIM/Immich*,
+          then in Google Photos on the same phone turn on the backup of the `admin` folder (*Settings → Backup → Back up
+          device folders*) and, on Pixel 2–5, keep *Backup quality* on *Storage saver* (the free unlimited one). Each
+          photo then reaches Google Photos a few minutes after it reaches Immich.
+
           Tried it on a phone other than a Pixel 5? Please [open a test report](https://github.com/${{ github.repository }}/issues/new?template=test-report.yml).
 
           Versions used (the same as Immich's official Docker image for $V):

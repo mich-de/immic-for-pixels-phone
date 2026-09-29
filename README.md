@@ -72,6 +72,17 @@ Android 12–13 (step 3).
 4. From any device on the same Wi-Fi open that address in a browser and create the admin account.
 5. On your other phones install the official **Immich** app (Play Store, F-Droid or GitHub), enter the same address as
    *Server URL*, log in and turn on backup.
+6. **To send every photo to Google Photos right away** (the reason to use a Pixel 1–5), on the server phone:
+   - in the app turn on **Keep the originals in DCIM/Immich** (it asks for the *Storage* permission, restarts the server
+     and moves the photos already uploaded: a few minutes);
+   - in Google Photos on the same phone, signed in with your account: *Settings → Backup* on, and *Backup quality* on
+     **Storage saver** on Pixel 2–5 — that is the free unlimited one; Original quality would use your Google storage
+     (on the first Pixel Original quality is free too);
+   - *Settings → Backup → Back up device folders* → turn on **admin** (it shows up once the first photos are in
+     `DCIM/Immich`).
+
+   From then on each photo that reaches Immich lands in `DCIM/Immich/admin` within a few minutes, and Google Photos backs
+   it up right away, with no extra copies.
 
 Good to know:
 - reserve the phone's IP in your router (static DHCP), otherwise the address can change; outside home you need a VPN
@@ -179,19 +190,28 @@ The photos and videos you upload to Immich live in the **app's private storage**
 is in the database). Gallery, Files and Google Photos **can't see them**. To view them use Immich (web or app); to copy
 them to a PC see [Data and backups](#data-and-backups).
 
-To get them into **Google Photos through the Pixel 5**, the app has a *Gallery and Google Photos*
-section: it copies the originals into the phone's gallery, folder `DCIM/Immich`, and from there the Google
-Photos app can back them up. The originals are copied byte for byte, so the capture date stays the one in the metadata
-(EXIF, or the video's creation date); for files without metadata (screenshots, PNG) Android uses the date of the copy.
+There are two ways to get them into **Google Photos through the Pixel**:
 
-1. Press *Test image*: an «Immich» folder with a test image appears in the gallery.
-2. In Google Photos: *Settings → Backup → Back up device folders* and turn on «Immich» (once).
-3. Tick *Copy new photos to the gallery automatically* (every 5 minutes), or use *Copy now*.
+- **Recommended — originals in DCIM/Immich.** Turn on *Keep the originals in DCIM/Immich*: Immich then keeps the
+  originals in `DCIM/Immich/<user>` (`admin` for the administrator) under their real names, where Google Photos sees
+  them. No copies, and each new photo reaches Google Photos a few minutes after it reaches Immich. In Google Photos turn
+  on the backup of the **admin** folder once (*Settings → Backup → Back up device folders*). Details and caveats in
+  [Originals directly in DCIM/Immich](#originals-directly-in-dcimimmich).
+- **Temporary gallery copy**, if you prefer to keep the originals private: the *Gallery and Google Photos* section copies
+  the originals into the phone's gallery, folder `DCIM/Immich`, and deletes each copy some days later (see below). The
+  originals are copied byte for byte, so the capture date stays the one in the metadata (EXIF, or the video's creation
+  date); for files without metadata (screenshots, PNG) Android uses the date of the copy.
+  1. Press *Test image*: an «Immich» folder with a test image appears in the gallery.
+  2. In Google Photos: *Settings → Backup → Back up device folders* and turn on «Immich» (once).
+  3. Tick *Copy new photos to the gallery automatically* (every 5 minutes), or use *Copy now*.
 
-Notes: only the admin's photos are copied (the other users' only if you tick that option, so as not to mix their
-albums into your Google Photos) and never Immich's «locked» ones. On a Pixel 5 Google Photos' free unlimited storage is
-in *Storage saver* quality (photos reduced to 16 MP, videos to 1080p), not original quality. **Don't turn on backup of
-the «Immich» folder in the Immich app**: it would send those files back to the server.
+  Only the admin's photos are copied (the other users' only if you tick that option, so as not to mix their albums
+  into your Google Photos) and never Immich's «locked» ones.
+
+Either way, keep Google Photos' *Backup quality* on **Storage saver** on Pixel 2–5: that is the free unlimited one
+(photos reduced to 16 MP, videos to 1080p); Original quality would count against your Google storage. On the first
+Pixel, Original quality is free too. **Don't back up those folders with the Immich app**: it would send the files back
+to the server.
 
 ### No second copy: the gallery copy is temporary
 
@@ -235,7 +255,7 @@ Space* (*Select cutoff date*, *Custom date*) moves to the device trash only the 
 *Free up space* on that phone won't help if Google Photos' backup is off there: it only frees what that phone uploaded
 itself.
 
-### Originals directly in DCIM/Immich (optional)
+### Originals directly in DCIM/Immich
 
 Instead of the app's private folder, Immich can keep the originals in shared storage, where the gallery and Google
 Photos see them directly, with no temporary copies:
