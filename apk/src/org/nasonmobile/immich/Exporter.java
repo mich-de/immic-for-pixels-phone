@@ -96,6 +96,10 @@ final class Exporter {
         Util.mkdirs(dir);
         File wmFile = new File(dir, "watermark.txt");
         File doneFile = new File(dir, "done.txt");
+        if (c.dcimActive()) {
+            trackDcim(stack, c, doneFile);
+            return;
+        }
 
         String wm = "1970-01-01 00:00:00+00";
         String lastId = "00000000-0000-0000-0000-000000000000";
@@ -167,6 +171,39 @@ final class Exporter {
                 + (skipped > 0 ? " (" + skipped + " saltati: file mancante o formato non supportato)" : "") + ".";
     }
 
+    /**
+     * Originali in DCIM (DcimMode): nessuna copia, Google Foto li vede già. Si annota solo quando ciascuno è arrivato
+     * in DCIM/Immich (Immich ce lo sposta dopo averne letto i metadati): è il momento da cui Pruner conta i giorni.
+     */
+    private static void trackDcim(Stack stack, Cfg c, File doneFile) throws Exception {
+        Set<String> done = new HashSet<>();
+        if (doneFile.isFile()) {
+            for (String l : Util.read(doneFile).split("\n")) {
+                if (!l.isEmpty()) done.add(l);
+            }
+        }
+        String out = stack.query(c, "SELECT a.id FROM asset a WHERE a.\"deletedAt\" IS NULL "
+            + "AND a.\"originalPath\" LIKE '/data/library/%'");
+        long now = System.currentTimeMillis();
+        int inDcim = 0;
+        int added = 0;
+        try (FileWriter w = new FileWriter(doneFile, true)) {
+            for (String line : out.split("\n")) {
+                String id = line.trim();
+                if (!id.matches("[0-9a-f-]{36}")) continue;
+                inDcim++;
+                if (done.add(id)) {
+                    Pruner.markExported(c, id, now);
+                    w.write(id + "\n");
+                    added++;
+                }
+            }
+        }
+        String when = new SimpleDateFormat("HH:mm", Locale.ITALY).format(new Date());
+        status = "Originali in DCIM/Immich: niente copie, Google Foto li vede direttamente. Ultimo controllo alle " + when
+            + ": " + inDcim + " foto in DCIM" + (added > 0 ? " (" + added + " arrivate ora)" : "") + ".";
+    }
+
     private static String sqlNew(String wm, String lastId, boolean allUsers) {
         return "SELECT row_to_json(t) FROM (SELECT a.id, a.\"originalPath\" AS path, a.\"originalFileName\" AS name, a.type, "
             + "to_char(a.\"fileCreatedAt\" AT TIME ZONE 'UTC','YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS taken, "
@@ -192,7 +229,7 @@ final class Exporter {
     private static File source(Cfg c, JSONObject r) throws Exception {
         String path = r.getString("path"); // percorso dentro Debian: /data/upload/...
         if (!path.startsWith("/data/")) return null;
-        File src = new File(c.library, path.substring("/data/".length()));
+        File src = c.hostPath(path);
         return src.isFile() ? src : null;
     }
 

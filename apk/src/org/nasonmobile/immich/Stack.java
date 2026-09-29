@@ -98,6 +98,20 @@ final class Stack {
         if (l != null) l.changed();
     }
 
+    /** per i lavori fatti durante la preparazione, prima dei servizi (DcimMode) */
+    void installing(int pct, String msg) {
+        if (state != State.INSTALLING) set(State.INSTALLING, msg);
+        setProgress(pct, msg);
+    }
+
+    boolean isStopping() {
+        return stopping;
+    }
+
+    void note(Cfg c, String msg) {
+        log(c, msg);
+    }
+
     // ------------------------------------------------------------------ start / stop
 
     synchronized void start(Context ctx) {
@@ -251,6 +265,10 @@ final class Stack {
             }
             Util.touch(new File(c.pgdata, ".initdb-ok"));
         }
+        if (stopping) throw new InterruptedException();
+
+        // 5. originali nella memoria condivisa, se richiesto (a server fermo: vedi DcimMode)
+        DcimMode.prepare(this, c);
     }
 
     /** GUEST_LEVEL=n in guest-setup.sh o in etc/immich-guest-ready (le installazioni senza la riga sono al livello 1) */
@@ -406,7 +424,14 @@ final class Stack {
         for (String e : extra) {
             if (e.equals("pg")) m.put(c.pgdata, "/pgdata");
             else if (e.equals("valkey")) m.put(c.valkey, "/valkey");
-            else if (e.equals("lib")) m.put(c.library, "/data");
+            else if (e.equals("lib")) {
+                m.put(c.library, "/data");
+                if (c.dcimActive()) {
+                    // originali nella memoria condivisa (DcimMode): dentro /data, proot fa vincere il collegamento più lungo
+                    m.put(c.dcimUpload(), "/data/upload");
+                    m.put(c.dcimLibrary(), "/data/library");
+                }
+            }
         }
         return m;
     }
@@ -447,6 +472,8 @@ final class Stack {
 
         // Immich
         if (stopping) throw new InterruptedException();
+        // originali in DCIM: il modello di archiviazione segue l'interruttore (Immich legge la configurazione all'avvio)
+        if (c.dcimActive()) applyStorageTemplate(c, pgm);
         set(State.STARTING, "Avvio Immich (la prima volta impiega qualche minuto)…");
         Svc im = startImmich(c);
         waitPing(c, im);
@@ -455,6 +482,8 @@ final class Stack {
         File mlMarker = new File(c.pgdata, ".ml-off-done"); // nella cartella del DB: se il DB si azzera, si rifà
         if (!mlMarker.exists()) {
             set(State.STARTING, "Disattivo il machine learning…");
+            // database appena creato da Immich: prima dell'avvio la tabella della configurazione non c'era
+            if (c.dcimActive()) applyStorageTemplate(c, pgm);
             if (runGuestTimed(c, "postgres", binds(c, "pg"), new LinkedHashMap<String, String>(),
                 Configs.psql(pgm, "immich", Configs.ML_OFF_SQL), null, 60_000, true) == 0) {
                 Util.touch(mlMarker);
@@ -480,7 +509,9 @@ final class Stack {
                 long lastPrune = 0;
                 while (!stopping) {
                     long now = System.currentTimeMillis();
-                    boolean due = c.prefs.getBoolean("export_enabled", false) && now - last > 5 * 60_000L;
+                    // con gli originali in DCIM non si copia nulla, ma si annota quando arrivano là (vedi Exporter)
+                    boolean on = c.prefs.getBoolean("export_enabled", false) || c.dcimActive();
+                    boolean due = on && now - last > 5 * 60_000L;
                     if ((due || exportNow) && state == State.RUNNING) {
                         exportNow = false;
                         last = now;
@@ -489,7 +520,9 @@ final class Stack {
                     // eliminazione da Immich: gira per conto suo, non serve la copia automatica attiva (vedi Pruner)
                     if (now - lastPrune > 5 * 60_000L && state == State.RUNNING) {
                         lastPrune = now;
+                        DcimMode.afterStart(c);
                         Pruner.runOnce(c);
+                        MissingCleaner.runIfDue(Stack.this, c);
                     }
                     try {
                         Thread.sleep(4000);
@@ -514,6 +547,13 @@ final class Stack {
             Configs.psql(pgMajor(c), "immich", sql), out, 120_000, false);
         if (rc != 0) throw new IOException("query fallita (codice " + rc + "): " + out.toString().trim());
         return out.toString();
+    }
+
+    /** modello di archiviazione di Immich come vuole l'interruttore degli originali in DCIM (vedi Configs, DcimMode) */
+    private void applyStorageTemplate(Cfg c, String pgm) throws Exception {
+        int rc = runGuestTimed(c, "postgres", binds(c, "pg"), new LinkedHashMap<String, String>(),
+            Configs.psql(pgm, "immich", Configs.storageTemplateSql(c.dcimWanted())), null, 60_000, true);
+        if (rc != 0) log(c, "modello di archiviazione non impostato (codice " + rc + ")");
     }
 
     private Svc startImmich(Cfg c) {

@@ -131,6 +131,25 @@ final class Configs {
             + "ON CONFLICT (key) DO UPDATE SET value = system_metadata.value || jsonb_build_object('machineLearning', "
             + "COALESCE(system_metadata.value->'machineLearning', '{}'::jsonb) || '{\"enabled\":false}'::jsonb)";
 
+    /**
+     * Modello di archiviazione di Immich con gli originali in DCIM (vedi DcimMode): tutti i file di un utente in una
+     * cartella sola, library/<etichetta>/<nome originale>, perché Google Foto fa il backup cartella per cartella e
+     * con le sottocartelle di upload/ (xx/yy) ne vedrebbe centinaia. Spento: resta il modello, cambia solo "enabled".
+     * Nel database appena creato la tabella non c'è ancora (la crea Immich al primo avvio): allora non fa nulla.
+     */
+    static String storageTemplateSql(boolean enabled) {
+        String value = enabled ? "{\"enabled\":true,\"template\":\"{{filename}}\"}" : "{\"enabled\":false}";
+        return "DO $$ BEGIN IF to_regclass('public.system_metadata') IS NOT NULL THEN "
+            + "INSERT INTO system_metadata (key, value) VALUES ('system-config', jsonb_build_object('storageTemplate', '"
+            + value + "'::jsonb)) ON CONFLICT (key) DO UPDATE SET value = system_metadata.value || jsonb_build_object("
+            + "'storageTemplate', COALESCE(system_metadata.value->'storageTemplate', '{}'::jsonb) || '" + value + "'::jsonb); "
+            + "END IF; END $$";
+    }
+
+    /** "true"/"false"/"" : il modello di archiviazione è attivo nella configurazione salvata? */
+    static final String STORAGE_TEMPLATE_ENABLED_SQL =
+        "SELECT COALESCE((SELECT value->'storageTemplate'->>'enabled' FROM system_metadata WHERE key='system-config'), 'false')";
+
     static final String DB_EXISTS_SQL = "SELECT 1 FROM pg_database WHERE datname='immich'";
     static final String DB_CREATE_SQL = "CREATE DATABASE immich OWNER immich";
 }

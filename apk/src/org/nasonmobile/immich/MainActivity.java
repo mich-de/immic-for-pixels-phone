@@ -43,6 +43,7 @@ public class MainActivity extends Activity {
     private static final int C_ERR = Color.parseColor("#B3261E");
     private static final int C_ACCENT = Color.parseColor("#3B4BA8");
     private static final int REQ_STORAGE = 100;
+    private static final int REQ_STORAGE_DCIM = 101;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private Cfg cfg;
@@ -56,6 +57,9 @@ public class MainActivity extends Activity {
     private TextView pruneStatus;
     private TextView backupStatus;
     private TextView batteryStatus;
+    private TextView dcimStatus;
+    private TextView missingStatus;
+    private CheckBox dcimBox;
     private EditText apiKeyField;
     private TextView logView;
     private ProgressBar bar;
@@ -93,10 +97,32 @@ public class MainActivity extends Activity {
     /**
      * Comandi da adb (comodi anche a telefono bloccato):
      * "--ez start true" avvia il server; "--ez export_dry true" prova a secco della copia in galleria (solo conteggi);
-     * "--ez export_test true [--el export_test_ms MILLISECONDI]" crea l'immagine di prova in DCIM/Immich.
+     * "--ez export_test true [--el export_test_ms MILLISECONDI]" crea l'immagine di prova in DCIM/Immich;
+     * "--ez dcim_originals true|false" interruttore degli originali in DCIM (serve il permesso Memoria, da adb:
+     * pm grant org.nasonmobile.immich android.permission.WRITE_EXTERNAL_STORAGE); "--ez missing_cleanup true|false"
+     * pulizia notturna delle foto senza file; "--ez missing_cleanup_now true" la fa subito; "--ez restart true"
+     * riavvia il server (anche dopo gli interruttori, che si applicano all'avvio).
      */
     private void handleIntent(final Intent in) {
         if (in == null) return;
+        if (in.hasExtra("dcim_originals")) {
+            boolean on = in.getBooleanExtra("dcim_originals", false);
+            DcimMode.onSwitch(cfg, on);
+            if (dcimBox != null) dcimBox.setChecked(on);
+            android.util.Log.i(Cfg.TAG, "originali in DCIM da adb: " + on);
+        }
+        if (in.hasExtra("missing_cleanup")) {
+            cfg.prefs.edit().putBoolean("missing_cleanup", in.getBooleanExtra("missing_cleanup", false)).apply();
+        }
+        if (in.getBooleanExtra("missing_cleanup_now", false)) {
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    MissingCleaner.runNow(Stack.I, cfg);
+                }
+            }, "immich-missing").start();
+        }
+        if (in.getBooleanExtra("restart", false)) restartServer();
         // "--es prune_api_key VALORE": la salva passando dal codice dell'app (mai scrivere shared_prefs da fuori
         // mentre l'app è viva: un apply() successivo dell'app la sovrascriverebbe con la copia in memoria).
         if (in.hasExtra("prune_api_key")) {
@@ -182,7 +208,60 @@ public class MainActivity extends Activity {
             } else {
                 Toast.makeText(this, "Serve il permesso \"Memoria\" per copiare sul telefono", Toast.LENGTH_LONG).show();
             }
+        } else if (requestCode == REQ_STORAGE_DCIM) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                applyDcim(true);
+            } else {
+                dcimBox.setChecked(false);
+                Toast.makeText(this, "Serve il permesso \"Memoria\" per salvare gli originali in DCIM", Toast.LENGTH_LONG).show();
+            }
         }
+    }
+
+    /** interruttore degli originali in DCIM: prima il permesso Memoria, poi si applica riavviando il server */
+    private void onDcimSwitch(boolean on) {
+        if (on == cfg.dcimWanted()) return;
+        if (on && checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.READ_EXTERNAL_STORAGE},
+                REQ_STORAGE_DCIM);
+            return;
+        }
+        applyDcim(on);
+    }
+
+    private void applyDcim(boolean on) {
+        DcimMode.onSwitch(cfg, on);
+        Stack.State s = Stack.I.state();
+        if (s == Stack.State.IDLE || s == Stack.State.ERROR) {
+            Toast.makeText(this, "Si applica al prossimo avvio del server", Toast.LENGTH_LONG).show();
+        } else {
+            Toast.makeText(this, on ? "Riavvio il server e sposto gli originali in DCIM (qualche minuto)" : "Riavvio il server",
+                Toast.LENGTH_LONG).show();
+            restartServer();
+        }
+    }
+
+    /** ferma il server e lo riavvia appena è fermo del tutto (gli interruttori che toccano i file si applicano all'avvio) */
+    private void restartServer() {
+        Stack.State s0 = Stack.I.state();
+        if (s0 == Stack.State.IDLE || s0 == Stack.State.ERROR) {
+            startForegroundService(new Intent(this, ServerService.class).setAction(ServerService.ACTION_START));
+            return;
+        }
+        startService(new Intent(this, ServerService.class).setAction(ServerService.ACTION_STOP));
+        handler.postDelayed(new Runnable() {
+            int tries;
+
+            @Override
+            public void run() {
+                Stack.State s = Stack.I.state();
+                if (s == Stack.State.IDLE || s == Stack.State.ERROR) {
+                    startForegroundService(new Intent(MainActivity.this, ServerService.class).setAction(ServerService.ACTION_START));
+                } else if (++tries < 180) {
+                    handler.postDelayed(this, 1000);
+                }
+            }
+        }, 1000);
     }
 
     private void startBackup() {
@@ -543,6 +622,60 @@ public class MainActivity extends Activity {
         pruneStatus = text("", 12, C_MUTED, false);
         root.addView(pruneStatus, lp(6));
 
+        root.addView(text("Originali direttamente in DCIM/Immich", 14, C_TEXT, true), lp(20));
+        root.addView(text("Invece che nella cartella privata dell'app, Immich salva gli originali in DCIM/Immich/<utente> "
+            + "(per l'amministratore \"admin\") con il loro nome vero: Galleria e Google Foto li vedono subito, senza "
+            + "copie temporanee. In Google Foto attiva una volta il backup della cartella \"admin\" (Impostazioni → "
+            + "Backup → Cartelle del dispositivo). Attenzione: da lì anche le altre app possono cancellarli, per esempio "
+            + "\"Libera spazio\" di Google Foto dopo il backup; Immich resta allora con la foto senza l'originale (vedi la "
+            + "pulizia qui sotto). Miniature, video convertiti e database restano privati. Accendendolo il server si "
+            + "riavvia e sposta le foto già caricate (qualche minuto); serve il permesso Memoria.", 12, C_MUTED, false), lp(4));
+        dcimBox = new CheckBox(this);
+        dcimBox.setText("Salva gli originali in DCIM/Immich");
+        dcimBox.setChecked(cfg.dcimWanted());
+        dcimBox.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton b, boolean checked) {
+                onDcimSwitch(checked);
+            }
+        });
+        root.addView(dcimBox, lp(6));
+        dcimStatus = text("", 12, C_MUTED, false);
+        root.addView(dcimStatus, lp(4));
+
+        CheckBox missing = new CheckBox(this);
+        missing.setText("Ogni notte sposta nel cestino di Immich le foto il cui file non c'è più");
+        missing.setChecked(cfg.prefs.getBoolean("missing_cleanup", false));
+        missing.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton b, boolean checked) {
+                cfg.prefs.edit().putBoolean("missing_cleanup", checked).apply();
+            }
+        });
+        root.addView(missing, lp(8));
+        root.addView(text("Usa il controllo notturno di Immich (alle 3: Amministrazione → Manutenzione → Report di integrità → "
+            + "File mancanti) e la chiave API qui sopra; dal cestino di Immich si recuperano per 30 giorni. Non tocca nulla "
+            + "se ne mancano troppi insieme o se le cartelle non sono leggibili.", 12, C_MUTED, false), lp(2));
+        root.addView(button("Controlla ora", new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        final String r = MissingCleaner.runNow(Stack.I, cfg);
+                        handler.post(new Runnable() {
+                            @Override
+                            public void run() {
+                                Toast.makeText(MainActivity.this, r, Toast.LENGTH_LONG).show();
+                            }
+                        });
+                    }
+                }, "immich-missing").start();
+            }
+        }), lp(4));
+        missingStatus = text("", 12, C_MUTED, false);
+        root.addView(missingStatus, lp(4));
+
         root.addView(text("Avanzate", 16, C_TEXT, true), lp(24));
         CheckBox noSec = new CheckBox(this);
         noSec.setText("proot senza seccomp (solo se il server si blocca all'avvio)");
@@ -662,6 +795,8 @@ public class MainActivity extends Activity {
 
         exportStatus.setText(Exporter.status() + "\n" + Exporter.stagedInfo(cfg));
         pruneStatus.setText(Pruner.status());
+        dcimStatus.setText(DcimMode.status(cfg));
+        missingStatus.setText(MissingCleaner.status(cfg));
 
         backupBtn.setText(Backup.running() ? "Ferma la copia" : "Copia ora sul telefono");
         backupStatus.setText(Backup.status());

@@ -202,6 +202,47 @@ server (per recuperare davvero lo spazio svuota il cestino della galleria), e fa
 *Libera spazio* di Google Foto su quel telefono non serve se lì il backup di Google Foto è spento: libera solo quello che
 ha caricato quel telefono.
 
+### Originali direttamente in DCIM/Immich (facoltativo)
+
+Invece che nella cartella privata dell'app, Immich può tenere gli originali nella memoria condivisa, dove Galleria e
+Google Foto li vedono direttamente, senza copie temporanee:
+
+| Dentro Immich | Sul telefono |
+|---|---|
+| `/data/upload` (appena caricati) | `DCIM/.immich-upload` (nascosta: Android non la indicizza) |
+| `/data/library` (sistemati da Immich) | `DCIM/Immich/<utente>/<nome originale>` (la cartella dell'amministratore è `admin`) |
+
+Attiva *Salva gli originali in DCIM/Immich*: l'app chiede il permesso *Memoria*, riavvia il server e sposta le foto già
+caricate (qualche minuto; se si interrompe riprende). Imposta il modello di archiviazione di Immich a `{{filename}}` —
+una cartella per utente, perché Google Foto fa il backup cartella per cartella e le sottocartelle `upload/xx/yy` di
+Immich gli sembrerebbero centinaia di cartelle — e Immich sposta ogni foto nuova da `upload` a `library` appena ne ha
+letto i metadati. Le due cartelle stanno sulla stessa memoria, quindi lo spostamento è una rinomina istantanea e Google
+Foto non vede mai un file scritto a metà. Miniature, video convertiti, database e backup restano privati. In Google Foto
+attiva una volta il backup della cartella `admin` (*Impostazioni → Backup → Cartelle del dispositivo*).
+
+Da sapere:
+- ora anche le altre app possono cancellare gli originali, per esempio *Libera spazio* di Google Foto dopo il backup:
+  Immich resta allora con la foto (anteprima) senza l'originale — vedi la pulizia qui sotto;
+- la copia in galleria (*Galleria e Google Foto*) non serve più: con questa opzione l'app non fa copie e annota solo
+  quando ogni originale arriva in `DCIM/Immich`, cioè il momento da cui *Elimina l'originale da Immich dopo* conta i
+  giorni;
+- foto in movimento: anche la parte video che Immich ne estrae finirebbe lì, come video corto a parte;
+- rispegnere l'opzione ferma solo lo spostamento delle foto *nuove* in `DCIM/Immich` (restano nella cartella nascosta);
+  quelle già lì restano dove sono;
+- il comando `tar` dal PC in [Dati e backup](#dati-e-backup) copia solo la cartella privata: in questa modalità copia
+  anche `DCIM/Immich` e `DCIM/.immich-upload`.
+
+### Pulizia delle foto il cui file non c'è più
+
+Ogni notte alle 3 Immich controlla quali originali del suo database non esistono più sul disco (*Amministrazione →
+Manutenzione → Report di integrità → File mancanti*); lì il pulsante *Elimina tutti* sposta quelle foto nel cestino di
+Immich (recuperabili per 30 giorni, poi Immich le toglie). Con *Ogni notte sposta nel cestino di Immich le foto il cui
+file non c'è più* l'app preme quel pulsante da sola una volta al giorno dopo le 4, con la chiave API qui sopra (serve il
+permesso `all`, o quello dei processi). Non fa nulla se le cartelle degli originali non sono leggibili (permesso Memoria
+tolto: sembrerebbero mancare tutte) o se ne mancano troppe insieme (più di 20 e più del 10%): meglio guardare prima.
+*Controlla ora* la fa subito. Vale anche qui l'avvertenza sulle foto che arrivano da un altro telefono: quando una foto
+esce dal cestino di Immich, quel telefono la ricarica se ce l'ha ancora.
+
 ## Diagnosi, log e ripristino
 
 Nell'app: **Esegui diagnosi** verifica proot, Debian, Node, `sharp` (miniature), ffmpeg ed exiftool con prove reali e
@@ -218,6 +259,8 @@ adb shell am start -n org.nasonmobile.immich/.MainActivity --ez export_test true
 adb shell am start -n org.nasonmobile.immich/.MainActivity --ez export_dry true   # prova a secco della copia (solo conteggi nel log)
 adb shell am start -n org.nasonmobile.immich/.MainActivity --ez export_purge true      # elimina le copie scadute
 adb shell am start -n org.nasonmobile.immich/.MainActivity --ez export_purge_all true  # elimina tutte le copie in galleria
+adb shell am start -n org.nasonmobile.immich/.MainActivity --ez dcim_originals true --ez restart true  # originali in DCIM (serve il permesso Memoria)
+adb shell am start -n org.nasonmobile.immich/.MainActivity --ez missing_cleanup_now true  # pulizia subito delle foto senza file
 ```
 
 | Sintomo | Cosa fare |
@@ -359,7 +402,8 @@ apk/vendor/            pacchetti Termux di proot fissati (Termux toglie le versi
 apk/build.sh           costruisce e firma l'APK (aapt2, javac, d8, apksigner: niente Gradle)
 apk/install.sh         installa sul telefono via adb e prepara Android
 apk/src/…              l'app: Stack (installazione e servizi), ProotCmd, Tar, Configs, servizio, schermata,
-                        Exporter/Pruner (Google Foto), Backup (copia sul telefono), BatteryGuard (avviso carica)
+                        Exporter/Pruner (Google Foto), DcimMode (originali in DCIM), MissingCleaner (foto senza
+                        file), Backup (copia sul telefono), BatteryGuard (avviso carica)
 apk/assets/guest/      lo script che installa PostgreSQL, Valkey, jellyfin-ffmpeg dentro Debian
 apk/test/              prove sul PC: estrattore tar (TarCheck) e configurazioni (ConfigsDump)
 ```

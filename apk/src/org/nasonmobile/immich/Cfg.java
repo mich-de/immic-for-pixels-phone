@@ -3,6 +3,7 @@ package org.nasonmobile.immich;
 import android.app.ActivityManager;
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.os.Environment;
 
 import java.io.File;
 import java.security.SecureRandom;
@@ -58,6 +59,44 @@ final class Cfg {
 
     File setupLog() {
         return new File(logs, "setup.log");
+    }
+
+    // --- originali in DCIM (vedi DcimMode) ----------------------------------
+
+    /** /data/library di Immich (originali già sistemati dal modello di archiviazione): Galleria e Google Foto li vedono */
+    File dcimLibrary() {
+        return new File(Environment.getExternalStorageDirectory(), "DCIM/Immich");
+    }
+
+    /**
+     * /data/upload di Immich (caricamenti appena arrivati): cartella nascosta sulla STESSA memoria di DCIM/Immich, così
+     * lo spostamento fatto da Immich è una rinomina istantanea e Google Foto non vede mai un file scritto a metà.
+     */
+    File dcimUpload() {
+        return new File(Environment.getExternalStorageDirectory(), "DCIM/.immich-upload");
+    }
+
+    /** esiste quando gli originali sono stati spostati nella memoria condivisa: da lì in poi i collegamenti restano */
+    File dcimMarker() {
+        return new File(home, "dcim-originali");
+    }
+
+    /** ciò che vuole l'utente (l'interruttore); dcimActive() dice se lo spostamento è già stato fatto */
+    boolean dcimWanted() {
+        return prefs.getBoolean("dcim_originals", false);
+    }
+
+    boolean dcimActive() {
+        return dcimMarker().exists();
+    }
+
+    /** file vero sul telefono di un percorso visto da Immich ("/data/upload/...") */
+    File hostPath(String guestPath) {
+        if (dcimActive()) {
+            if (guestPath.startsWith("/data/upload/")) return new File(dcimUpload(), guestPath.substring(13));
+            if (guestPath.startsWith("/data/library/")) return new File(dcimLibrary(), guestPath.substring(14));
+        }
+        return new File(library, guestPath.startsWith("/data/") ? guestPath.substring(6) : guestPath);
     }
 
     // --- impostazioni ------------------------------------------------------

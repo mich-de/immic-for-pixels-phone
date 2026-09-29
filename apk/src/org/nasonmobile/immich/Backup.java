@@ -50,7 +50,7 @@ final class Backup {
         return new File(Environment.getExternalStorageDirectory(), DIR);
     }
 
-    /** Un giro completo: cammina dentro "upload" e copia quello che manca o è cambiato. Non lancia eccezioni. */
+    /** Un giro completo: cammina tra gli originali e copia quello che manca o è cambiato. Non lancia eccezioni. */
     static synchronized void runOnce(Cfg c) {
         if (running) return;
         running = true;
@@ -58,15 +58,20 @@ final class Backup {
         long t0 = System.currentTimeMillis();
         Counts n = new Counts();
         try {
-            File src = new File(c.library, "upload");
-            if (!src.isDirectory()) {
+            File dst = destDir();
+            // con gli originali in DCIM (DcimMode) stanno in due posti: arrivati di recente e già sistemati da Immich
+            File[][] pairs = c.dcimActive()
+                ? new File[][]{{c.dcimUpload(), dst}, {c.dcimLibrary(), new File(dst, "library")}}
+                : new File[][]{{new File(c.library, "upload"), dst}};
+            if (!pairs[0][0].isDirectory() && !pairs[pairs.length - 1][0].isDirectory()) {
                 status = "Niente da copiare: la libreria di Immich è vuota.";
                 return;
             }
-            File dst = destDir();
             Util.mkdirs(dst);
             status = "Preparazione…";
-            walk(src, dst, n);
+            for (File[] p : pairs) {
+                if (p[0].isDirectory() && !stopRequested && !n.lowSpace) walk(p[0], p[1], n);
+            }
             long secs = Math.max(1, (System.currentTimeMillis() - t0) / 1000);
             if (stopRequested) {
                 status = "Interrotto: " + n.copied + " file copiati (" + mb(n.bytes) + "), " + n.skipped + " già presenti. "
