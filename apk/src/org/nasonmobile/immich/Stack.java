@@ -45,7 +45,7 @@ final class Stack {
     static final Stack I = new Stack();
 
     private volatile State state = State.IDLE;
-    private volatile String detail = "Fermo";
+    private volatile String detail = "Stopped";
     private volatile int progress = -1;
     private volatile Listener listener;
     private volatile boolean stopping;
@@ -140,7 +140,7 @@ final class Stack {
 
     private synchronized void doStop() {
         stopping = true;
-        set(State.STOPPING, "Arresto in corso…");
+        set(State.STOPPING, "Stopping…");
         Thread t = controller;
         if (t != null) t.interrupt();
         Thread et = exportThread;
@@ -158,7 +158,7 @@ final class Stack {
                 // pazienza
             }
         }
-        set(State.IDLE, "Fermo");
+        set(State.IDLE, "Stopped");
     }
 
     /**
@@ -175,7 +175,7 @@ final class Stack {
         try {
             Util.mkdirs(c.home, c.appRoot, c.logs, c.config, c.run, c.pgdata, c.valkey, c.library);
             Util.rotate(c.setupLog(), 4 << 20);
-            log(c, "=== avvio " + new java.util.Date() + " ===");
+            log(c, "=== start " + new java.util.Date() + " ===");
             ensureSetup(c);
             if (stopping) return;
             startServices(c);
@@ -184,10 +184,10 @@ final class Stack {
             // arresto richiesto
         } catch (Throwable t) {
             if (stopping) return;
-            log(c, "ERRORE: " + Log.getStackTraceString(t));
+            log(c, "ERROR: " + Log.getStackTraceString(t));
             for (Svc s : svcs) s.terminate();
             svcs.clear();
-            set(State.ERROR, "Errore: " + t.getMessage());
+            set(State.ERROR, "Error: " + t.getMessage());
         }
     }
 
@@ -205,8 +205,8 @@ final class Stack {
         // 1. sistema Debian
         File marker = new File(c.rootfs, ".extracted-ok");
         if (!marker.exists()) {
-            set(State.INSTALLING, "Estraggo il sistema Debian…");
-            extractAsset(c, "rootfs.tar.gz", c.rootfs, 1, "Estraggo il sistema Debian");
+            set(State.INSTALLING, "Extracting the Debian system…");
+            extractAsset(c, "rootfs.tar.gz", c.rootfs, 1, "Extracting the Debian system");
             Util.touch(marker);
         }
         if (stopping) throw new InterruptedException();
@@ -230,34 +230,34 @@ final class Stack {
         boolean debsChanged = !fresh && !debs.equals(guestDebs(installed));
         if (debsChanged && !newer) {
             String before = guestDebs(installed);
-            log(c, "il pacchetto Immich porta altri .deb (prima: " + (before.isEmpty() ? "non annotati" : before)
-                + "; ora: " + debs + "): rifaccio la preparazione di Debian");
+            log(c, "the Immich package brings different .debs (before: " + (before.isEmpty() ? "not recorded" : before)
+                + "; now: " + debs + "): redoing the Debian setup");
         }
         if (fresh || newer || debsChanged) {
-            set(State.INSTALLING, fresh ? "Installo PostgreSQL, Valkey e ffmpeg (10-30 minuti, serve internet)…"
-                : "Aggiorno i programmi del sistema Debian (qualche minuto, serve internet)…");
+            set(State.INSTALLING, fresh ? "Installing PostgreSQL, Valkey and ffmpeg (10-30 minutes, needs Internet)…"
+                : "Updating the programs of the Debian system (a few minutes, needs Internet)…");
             Util.write(new File(c.config, "guest-setup.sh"), script);
             Map<String, String> env = new LinkedHashMap<>();
             env.put("PG_MAJOR", pgm);
             int rc = runGuest(c, "root", binds(c), env, Arrays.asList("/bin/bash", "/config/guest-setup.sh", "setup"), null);
-            if (rc != 0 && fresh) throw new IOException("l'installazione dei programmi è fallita (codice " + rc + "): vedi il log");
+            if (rc != 0 && fresh) throw new IOException("installing the programs failed (code " + rc + "): see the log");
             // un aggiornamento fallito (per esempio senza rete) non deve lasciare fermo un server che funzionava
-            if (rc != 0) log(c, "aggiornamento dei programmi fallito (codice " + rc + "): parto con quelli di prima, riprovo al prossimo avvio");
+            if (rc != 0) log(c, "updating the programs failed (code " + rc + "): starting with the previous ones, retrying at the next start");
         }
         if (stopping) throw new InterruptedException();
 
         // 4. cluster PostgreSQL (il marcatore .initdb-ok si scrive solo a fine lavoro: un initdb interrotto si rifà da capo)
         if (!new File(c.pgdata, ".initdb-ok").exists()) {
-            set(State.INSTALLING, "Creo il database…");
+            set(State.INSTALLING, "Creating the database…");
             File[] partial = c.pgdata.listFiles();
             if (partial != null && partial.length > 0) {
-                log(c, "cluster PostgreSQL incompleto: lo cancello e lo rifaccio");
+                log(c, "incomplete PostgreSQL cluster: deleting it and starting over");
                 for (File f : partial) Util.deleteRecursive(f);
             }
             Map<String, String> env = new LinkedHashMap<>();
             env.put("LANG", "en_US.UTF-8");
             int rc = runGuest(c, "postgres", binds(c, "pg"), env, Configs.initdb(pgm), null);
-            if (rc != 0) throw new IOException("initdb fallito (codice " + rc + ")");
+            if (rc != 0) throw new IOException("initdb failed (code " + rc + ")");
             // le nostre impostazioni stanno in un file a parte, incluso dal principale
             File conf = new File(c.pgdata, "postgresql.conf");
             try (FileWriter w = new FileWriter(conf, true)) {
@@ -302,7 +302,7 @@ final class Stack {
         for (String n : new String[]{"libproot.so", "libproot-loader.so", "libtalloc.so", "libandroid-shmem.so"}) {
             File f = new File(c.nativeDir(), n);
             if (!f.isFile()) {
-                throw new IOException("manca " + n + " in " + c.nativeDir() + ": l'APK non è per un dispositivo arm64?");
+                throw new IOException("missing " + n + " in " + c.nativeDir() + ": is this APK for an arm64 device?");
             }
         }
     }
@@ -342,11 +342,11 @@ final class Stack {
             boolean offered = Assets.exists(c.ctx, "immich-pack.tar.gz");
             if (!offered || id.equals(c.prefs.getString("pack_id", ""))) return;
         }
-        set(State.INSTALLING, "Estraggo Immich…");
+        set(State.INSTALLING, "Extracting Immich…");
         File tmp = new File(c.appRoot, "pack.new");
-        extractAsset(c, "immich-pack.tar.gz", tmp, 1, "Estraggo Immich");
+        extractAsset(c, "immich-pack.tar.gz", tmp, 1, "Extracting Immich");
         Util.deleteRecursive(c.pack());
-        if (!tmp.renameTo(c.pack())) throw new IOException("impossibile attivare il nuovo pacchetto Immich");
+        if (!tmp.renameTo(c.pack())) throw new IOException("cannot activate the new Immich package");
         Util.touch(marker);
         c.prefs.edit().putString("pack_id", id).apply();
     }
@@ -449,7 +449,7 @@ final class Stack {
         writeConfigs(c);
 
         // PostgreSQL
-        set(State.STARTING, "Avvio PostgreSQL…");
+        set(State.STARTING, "Starting PostgreSQL…");
         File pidfile = new File(c.pgdata, "postmaster.pid");
         cleanStalePid(pidfile, "postgres");
         Map<String, String> pgEnv = new LinkedHashMap<>();
@@ -462,7 +462,7 @@ final class Stack {
 
         // Valkey
         if (stopping) throw new InterruptedException();
-        set(State.STARTING, "Avvio Valkey…");
+        set(State.STARTING, "Starting Valkey…");
         File vpid = new File(c.run, "valkey.pid");
         cleanStalePid(vpid, "valkey");
         Svc vk = new Svc(c, "valkey", "valkey", binds(c, "valkey"), new LinkedHashMap<String, String>(), Util.SIGTERM,
@@ -474,27 +474,27 @@ final class Stack {
         if (stopping) throw new InterruptedException();
         // originali in DCIM: il modello di archiviazione segue l'interruttore (Immich legge la configurazione all'avvio)
         if (c.dcimActive()) applyStorageTemplate(c, pgm);
-        set(State.STARTING, "Avvio Immich (la prima volta impiega qualche minuto)…");
+        set(State.STARTING, "Starting Immich (the first time takes a few minutes)…");
         Svc im = startImmich(c);
         waitPing(c, im);
 
         // Solo la prima volta: niente machine learning (troppo pesante, e il servizio non esiste su questo telefono)
         File mlMarker = new File(c.pgdata, ".ml-off-done"); // nella cartella del DB: se il DB si azzera, si rifà
         if (!mlMarker.exists()) {
-            set(State.STARTING, "Disattivo il machine learning…");
+            set(State.STARTING, "Turning off machine learning…");
             // database appena creato da Immich: prima dell'avvio la tabella della configurazione non c'era
             if (c.dcimActive()) applyStorageTemplate(c, pgm);
             if (runGuestTimed(c, "postgres", binds(c, "pg"), new LinkedHashMap<String, String>(),
                 Configs.psql(pgm, "immich", Configs.ML_OFF_SQL), null, 60_000, true) == 0) {
                 Util.touch(mlMarker);
-                log(c, "machine learning disattivato: riavvio Immich per applicarlo");
+                log(c, "machine learning turned off: restarting Immich to apply it");
                 svcs.remove(im);
                 im.terminate();
                 im = startImmich(c);
                 waitPing(c, im);
             }
         }
-        set(State.RUNNING, "In esecuzione");
+        set(State.RUNNING, "Running");
         startExporter(c);
     }
 
@@ -545,7 +545,7 @@ final class Stack {
         StringBuilder out = new StringBuilder();
         int rc = runGuestTimed(c, "postgres", binds(c, "pg"), new LinkedHashMap<String, String>(),
             Configs.psql(pgMajor(c), "immich", sql), out, 120_000, false);
-        if (rc != 0) throw new IOException("query fallita (codice " + rc + "): " + out.toString().trim());
+        if (rc != 0) throw new IOException("query failed (code " + rc + "): " + out.toString().trim());
         return out.toString();
     }
 
@@ -553,7 +553,7 @@ final class Stack {
     private void applyStorageTemplate(Cfg c, String pgm) throws Exception {
         int rc = runGuestTimed(c, "postgres", binds(c, "pg"), new LinkedHashMap<String, String>(),
             Configs.psql(pgm, "immich", Configs.storageTemplateSql(c.dcimWanted())), null, 60_000, true);
-        if (rc != 0) log(c, "modello di archiviazione non impostato (codice " + rc + ")");
+        if (rc != 0) log(c, "storage template not set (code " + rc + ")");
     }
 
     private Svc startImmich(Cfg c) {
@@ -570,7 +570,7 @@ final class Stack {
         while (!ping(c)) {
             if (stopping) throw new InterruptedException();
             if (im.failed != null) throw new IOException(im.failed);
-            if (System.currentTimeMillis() > end) throw new IOException("Immich non risponde dopo 20 minuti: vedi il log di Immich");
+            if (System.currentTimeMillis() > end) throw new IOException("Immich is not answering after 20 minutes: see the Immich log");
             Thread.sleep(2000);
         }
     }
@@ -597,9 +597,9 @@ final class Stack {
             }
             if (ping(c)) {
                 bad = 0;
-                if (state != State.RUNNING) set(State.RUNNING, "In esecuzione");
+                if (state != State.RUNNING) set(State.RUNNING, "Running");
             } else if (++bad >= 6 && state == State.RUNNING) {
-                set(State.STARTING, "Immich non risponde, riprovo…");
+                set(State.STARTING, "Immich is not answering, retrying…");
             }
         }
     }
@@ -634,7 +634,7 @@ final class Stack {
             }
             Thread.sleep(1000);
         }
-        throw new IOException(label + " non risponde sulla porta " + port + " dopo " + timeoutMs / 1000 + " s");
+        throw new IOException(label + " is not answering on port " + port + " after " + timeoutMs / 1000 + " s");
     }
 
     /** ruolo e database di Immich (idempotente) */
@@ -645,18 +645,18 @@ final class Stack {
             if (stopping) throw new InterruptedException();
             if (pg.failed != null) throw new IOException(pg.failed);
             if (sql(c, pgm, "SELECT 1", null, false) == 0) break;
-            if (System.currentTimeMillis() > end) throw new IOException("PostgreSQL non è pronto");
+            if (System.currentTimeMillis() > end) throw new IOException("PostgreSQL is not ready");
             Thread.sleep(2000);
         }
         if (sql(c, pgm, Configs.roleSql(c.dbPassword()), null, true) != 0) {
-            throw new IOException("creazione del ruolo 'immich' fallita (vedi il log)");
+            throw new IOException("creating the 'immich' role failed (see the log)");
         }
         StringBuilder out = new StringBuilder();
         if (sql(c, pgm, Configs.DB_EXISTS_SQL, out, true) != 0) {
-            throw new IOException("lettura dei database fallita (vedi il log)");
+            throw new IOException("reading the databases failed (see the log)");
         }
         if (!out.toString().trim().equals("1") && sql(c, pgm, Configs.DB_CREATE_SQL, null, true) != 0) {
-            throw new IOException("creazione del database fallita (vedi il log)");
+            throw new IOException("creating the database failed (see the log)");
         }
     }
 
@@ -676,19 +676,19 @@ final class Stack {
         if (rc == 0) return;
         String first = o1.toString().trim();
         if (!c.noSeccomp()) {
-            log(c, "prova di proot fallita: riprovo senza seccomp (PROOT_NO_SECCOMP=1)");
+            log(c, "proot test failed: retrying without seccomp (PROOT_NO_SECCOMP=1)");
             c.setNoSeccomp(true);
             StringBuilder o2 = new StringBuilder();
             rc = runGuestTimed(c, "root", binds(c), new LinkedHashMap<String, String>(), cmd, o2, 45_000, true);
             if (rc == 0) {
-                log(c, "ok: senza seccomp funziona, lo ricordo (proot sarà un po' più lento)");
+                log(c, "ok: it works without seccomp, remembering that (proot will be a bit slower)");
                 return;
             }
             c.setNoSeccomp(false);
             first = first + "\n" + o2.toString().trim();
         }
-        String why = rc == TIMED_OUT ? "si blocca" : "codice " + rc;
-        throw new IOException("proot non riesce a eseguire programmi nel sistema Debian (" + why + "). "
+        String why = rc == TIMED_OUT ? "it hangs" : "code " + rc;
+        throw new IOException("proot cannot run programs in the Debian system (" + why + "). "
             + (first.isEmpty() ? "" : first.substring(0, Math.min(first.length(), 300))));
     }
 
@@ -731,7 +731,7 @@ final class Stack {
         }
         int rc = p.waitFor();
         setupProc = null;
-        if (verbose) log(c, "  -> codice " + rc);
+        if (verbose) log(c, "  -> code " + rc);
         return rc;
     }
 
@@ -763,7 +763,7 @@ final class Stack {
             String out = Util.read(tmp);
             if (capture != null) capture.append(out);
             if (verbose || rc != 0) {
-                log(c, "  -> " + (rc == TIMED_OUT ? "bloccato (tempo scaduto)" : "codice " + rc)
+                log(c, "  -> " + (rc == TIMED_OUT ? "stuck (timed out)" : "code " + rc)
                     + (out.trim().isEmpty() ? "" : ": " + out.trim()));
             }
             return rc;
@@ -848,15 +848,15 @@ final class Stack {
                     ProcessBuilder pb = new ProotCmd(c).builder(user, binds, env, argv);
                     pb.redirectErrorStream(true);
                     pb.redirectOutput(ProcessBuilder.Redirect.appendTo(logFile));
-                    say("--- avvio " + name + " ---");
+                    say("--- start " + name + " ---");
                     proc = pb.start();
                     int rc = proc.waitFor();
                     if (stop) break;
-                    say("--- " + name + " terminato con codice " + rc + " ---");
+                    say("--- " + name + " exited with code " + rc + " ---");
                 } catch (InterruptedException e) {
                     break;
                 } catch (Exception e) {
-                    say("--- errore " + name + ": " + e + " ---");
+                    say("--- error " + name + ": " + e + " ---");
                 }
                 if (System.currentTimeMillis() - t0 < 30_000) {
                     fastFails++;
@@ -865,7 +865,7 @@ final class Stack {
                     backoff = 2;
                 }
                 if (fastFails >= 6) {
-                    failed = name + " si ferma subito ad ogni avvio: vedi il suo log";
+                    failed = name + " stops right after every start: see its log";
                     say(failed);
                     return;
                 }
@@ -893,7 +893,7 @@ final class Stack {
             int pid = Util.readPid(pidFile);
             boolean valid = pid > 0 && Util.pidMatches(pid, pidMatch);
             if (valid) Util.signal(pid, sig);
-            else if (pid > 0) say("pid " + pid + " non riconosciuto come " + pidMatch + " (non lo segnalo)");
+            else if (pid > 0) say("pid " + pid + " not recognized as " + pidMatch + " (not signalling it)");
             Thread t = th;
             if (t != null) {
                 try {
@@ -904,7 +904,7 @@ final class Stack {
             }
             Process p = proc;
             if (t != null && t.isAlive() && p != null) {
-                say("non si è fermato in tempo: chiudo proot");
+                say("did not stop in time: closing proot");
                 killProot(p);
                 if (t.isAlive() && valid) { // pidOf() non ha funzionato: proot è il padre del servizio
                     int pp = Util.ppidOf(pid);
@@ -924,37 +924,37 @@ final class Stack {
     /** Rapporto di prova: cosa c'è, cosa parte. Da incollare quando qualcosa non va. */
     String diagnose(Cfg c) {
         StringBuilder sb = new StringBuilder();
-        sb.append("Dispositivo: ").append(Build.MANUFACTURER).append(' ').append(Build.MODEL)
+        sb.append("Device: ").append(Build.MANUFACTURER).append(' ').append(Build.MODEL)
             .append(" · Android ").append(Build.VERSION.RELEASE).append(" (API ").append(Build.VERSION.SDK_INT).append(")\n");
         sb.append("ABI: ").append(Arrays.toString(Build.SUPPORTED_ABIS)).append(" · RAM ").append(c.totalMemMb())
             .append(" MB · kernel ").append(System.getProperty("os.version")).append('\n');
-        sb.append("Spazio libero: ").append(c.files.getUsableSpace() / (1024 * 1024)).append(" MB\n");
-        sb.append("Restrizioni processi figli: ").append(Health.phantomText(c.ctx)).append('\n');
-        sb.append("Esente dal risparmio batteria: ").append(Health.ignoringBattery(c.ctx) ? "sì" : "NO").append('\n');
-        sb.append("Indirizzi: ").append(Util.ipv4()).append("\n\n");
+        sb.append("Free space: ").append(c.files.getUsableSpace() / (1024 * 1024)).append(" MB\n");
+        sb.append("Child process restrictions: ").append(Health.phantomText(c.ctx)).append('\n');
+        sb.append("Exempt from battery optimization: ").append(Health.ignoringBattery(c.ctx) ? "yes" : "NO").append('\n');
+        sb.append("Addresses: ").append(Util.ipv4()).append("\n\n");
 
         for (String n : new String[]{"libproot.so", "libproot-loader.so", "libtalloc.so", "libandroid-shmem.so"}) {
             File f = new File(c.nativeDir(), n);
-            sb.append(f.isFile() ? "ok      " : "MANCA   ").append(n).append(f.isFile() ? " (" + f.length() + " byte)" : "").append('\n');
+            sb.append(f.isFile() ? "ok      " : "MISSING ").append(n).append(f.isFile() ? " (" + f.length() + " bytes)" : "").append('\n');
         }
-        sb.append("Debian estratto: ").append(new File(c.rootfs, ".extracted-ok").exists() ? "sì" : "no").append('\n');
-        sb.append("Pacchetto Immich: ").append(packInfo(c)).append('\n');
+        sb.append("Debian extracted: ").append(new File(c.rootfs, ".extracted-ok").exists() ? "yes" : "no").append('\n');
+        sb.append("Immich package: ").append(packInfo(c)).append('\n');
         File ready = new File(c.rootfs, "etc/immich-guest-ready");
         String level = "";
         try {
-            if (ready.exists()) level = " (livello " + guestLevel(Util.read(ready)) + ")";
+            if (ready.exists()) level = " (level " + guestLevel(Util.read(ready)) + ")";
         } catch (IOException ignored) {
             // solo informazione
         }
-        sb.append("Programmi installati: ").append(ready.exists() ? "sì" + level : "no").append('\n');
-        sb.append("Database creato: ").append(new File(c.pgdata, "PG_VERSION").exists() ? "sì" : "no").append("\n\n");
+        sb.append("Programs installed: ").append(ready.exists() ? "yes" + level : "no").append('\n');
+        sb.append("Database created: ").append(new File(c.pgdata, "PG_VERSION").exists() ? "yes" : "no").append("\n\n");
 
         try {
             Process p = new ProcessBuilder(new File(c.nativeDir(), "libproot.so").getPath(), "--version")
                 .redirectErrorStream(true).start();
             sb.append("proot --version:\n").append(readAll(p)).append('\n');
         } catch (Exception e) {
-            sb.append("proot non si avvia: ").append(e).append('\n');
+            sb.append("proot does not start: ").append(e).append('\n');
         }
 
         if (new File(c.rootfs, ".extracted-ok").exists()) {
@@ -970,7 +970,7 @@ final class Stack {
                     {"/opt/immich/node/bin/node", "-e", "const s=require('/opt/immich/server/node_modules/sharp');"
                         + "s({create:{width:2000,height:1333,channels:3,background:'#3b4ba8'}}).jpeg().toBuffer()"
                         + ".then(b=>s(b).resize(400).webp().toBuffer())"
-                        + ".then(o=>console.log('sharp ok: jpeg 2000x1333 -> webp 400px,',o.length,'byte'))"},
+                        + ".then(o=>console.log('sharp ok: jpeg 2000x1333 -> webp 400px,',o.length,'bytes'))"},
                     {"ffmpeg", "-v", "error", "-f", "lavfi", "-i", "testsrc=duration=2:size=640x360:rate=24",
                         "-c:v", "libx264", "-preset", "ultrafast", "-f", "null", "-"},
                     // video HDR (10 bit, BT.2020/PQ): Immich li converte con tonemapx, che c'è solo nell'ffmpeg di Jellyfin
@@ -981,19 +981,19 @@ final class Stack {
                     {"/opt/immich/node/bin/node", "-e", "require('/opt/immich/server/node_modules/exiftool-vendored')"
                         + ".exiftool.version().then(v=>{console.log('exiftool',v);process.exit(0)})"},
                 };
-                sb.append("proot senza seccomp: ").append(c.noSeccomp() ? "sì" : "no").append('\n');
+                sb.append("proot without seccomp: ").append(c.noSeccomp() ? "yes" : "no").append('\n');
                 for (String[] t : tests) {
                     StringBuilder out = new StringBuilder();
                     int rc = runGuestTimed(c, "root", b, new LinkedHashMap<String, String>(), Arrays.asList(t), out, 25_000, false);
                     sb.append("$ ").append(join(Arrays.asList(t))).append("  ->  ")
-                        .append(rc == TIMED_OUT ? "BLOCCATO" : String.valueOf(rc)).append('\n').append(out);
+                        .append(rc == TIMED_OUT ? "STUCK" : String.valueOf(rc)).append('\n').append(out);
                 }
             } catch (Exception e) {
-                sb.append("prova nel sistema Debian fallita: ").append(e).append('\n');
+                sb.append("test in the Debian system failed: ").append(e).append('\n');
             }
         }
         try {
-            Util.write(new File(c.logs, "diagnosi.txt"), sb.toString()); // per leggerla anche da adb
+            Util.write(new File(c.logs, "diagnostics.txt"), sb.toString()); // per leggerla anche da adb
         } catch (IOException ignored) {
             // solo comodità
         }

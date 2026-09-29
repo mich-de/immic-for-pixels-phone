@@ -47,8 +47,8 @@ final class BatteryGuard {
     static String statusText(Context ctx) {
         Intent b = current(ctx);
         int pct = percent(b);
-        if (pct < 0) return "sconosciuta";
-        return pct + "% " + (charging(b) ? "· in carica" : "· a batteria");
+        if (pct < 0) return "unknown";
+        return pct + "% " + (charging(b) ? "· charging" : "· on battery");
     }
 
     /**
@@ -82,12 +82,12 @@ final class BatteryGuard {
 
     private static void notify(Context ctx, int pct, boolean high) {
         NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
-        nm.createNotificationChannel(new NotificationChannel(CHANNEL, "Batteria", NotificationManager.IMPORTANCE_DEFAULT));
+        nm.createNotificationChannel(new NotificationChannel(CHANNEL, "Battery", NotificationManager.IMPORTANCE_DEFAULT));
         PendingIntent open = PendingIntent.getActivity(ctx, 2, new Intent(ctx, MainActivity.class),
             PendingIntent.FLAG_UPDATE_CURRENT);
-        String title = "Batteria al " + pct + "%";
-        String text = high ? "Scollega il caricabatterie: tenerla sempre al 100% la stressa."
-            : "Ricollega il caricabatterie: sta per scaricarsi troppo.";
+        String title = "Battery at " + pct + "%";
+        String text = high ? "Unplug the charger: sitting at 100% all the time wears the battery out."
+            : "Plug the charger back in: the battery is getting too low.";
         int small = ctx.getResources().getIdentifier("ic_stat", "drawable", ctx.getPackageName());
         Notification n = new Notification.Builder(ctx, CHANNEL)
             .setContentTitle(title)

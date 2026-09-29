@@ -60,7 +60,7 @@ final class ProotCmd {
                 }
             }
         }
-        throw new IOException("l'utente '" + name + "' non esiste nel sistema Debian (etc/passwd)");
+        throw new IOException("user '" + name + "' does not exist in the Debian system (etc/passwd)");
     }
 
     /**

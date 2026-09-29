@@ -26,9 +26,9 @@ final class ImmichApi {
 
         /** messaggio leggibile per lo stato mostrato nell'app */
         String problem() {
-            if (code == 401) return "chiave API non valida o scaduta";
-            if (code == 403) return "la chiave API non ha il permesso necessario (serve \"all\" o quello del lavoro)";
-            return "risposta " + code + (body.isEmpty() ? "" : ": " + body);
+            if (code == 401) return "API key not valid or expired";
+            if (code == 403) return "the API key lacks the needed permission (use \"all\" or the one for jobs)";
+            return "response " + code + (body.isEmpty() ? "" : ": " + body);
         }
     }
 

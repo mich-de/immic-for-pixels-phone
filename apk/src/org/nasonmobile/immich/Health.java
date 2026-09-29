@@ -27,7 +27,7 @@ final class Health {
     }
 
     private static String sizeText(long mb) {
-        return mb >= 1024 ? String.format(Locale.ITALY, "%.1f GB", mb / 1024.0) : mb + " MB";
+        return mb >= 1024 ? String.format(Locale.US, "%.1f GB", mb / 1024.0) : mb + " MB";
     }
 
     /** -1 tutto ok, 0 in esaurimento, 1 critico: comodo per scegliere il colore in MainActivity */
@@ -40,9 +40,9 @@ final class Health {
         long mb = freeMb(dataDir);
         String size = sizeText(mb);
         switch (spaceLevel(dataDir)) {
-            case 1: return "CRITICO: solo " + size + " liberi sul telefono — Postgres e le copie possono bloccarsi";
-            case 0: return "in esaurimento: " + size + " liberi sul telefono";
-            default: return size + " liberi sul telefono";
+            case 1: return "CRITICAL: only " + size + " free on the phone — Postgres and the copies may stall";
+            case 0: return "running low: " + size + " free on the phone";
+            default: return size + " free on the phone";
         }
     }
 
@@ -73,7 +73,7 @@ final class Health {
 
     static String phantomText(Context c) {
         int v = phantomRestrictions(c);
-        return v == 0 ? "disattivate (ok)" : v == 1 ? "ATTIVE (Android può uccidere il server)" : "non impostate (di norma attive)";
+        return v == 0 ? "disabled (ok)" : v == 1 ? "ACTIVE (Android may kill the server)" : "not set (usually active)";
     }
 
     /** comandi adb da lanciare una volta dal PC */

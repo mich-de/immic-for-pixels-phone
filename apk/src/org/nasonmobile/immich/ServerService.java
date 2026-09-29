@@ -82,10 +82,10 @@ public class ServerService extends Service {
         if (Stack.I.state() == Stack.State.RUNNING) {
             List<String> ips = Util.ipv4();
             String ip = ips.isEmpty() ? "127.0.0.1" : ips.get(0).substring(ips.get(0).indexOf(' ') + 1);
-            text = "In esecuzione · http://" + ip + ":" + c.port();
+            text = "Running · http://" + ip + ":" + c.port();
             int lvl = Health.spaceLevel(c.files);
-            if (lvl == 1) text += " · SPAZIO QUASI FINITO";
-            else if (lvl == 0) text += " · spazio in esaurimento";
+            if (lvl == 1) text += " · STORAGE ALMOST FULL";
+            else if (lvl == 0) text += " · storage running low";
         }
         PendingIntent open = PendingIntent.getActivity(this, 0, new Intent(this, MainActivity.class),
             PendingIntent.FLAG_UPDATE_CURRENT);
@@ -98,9 +98,9 @@ public class ServerService extends Service {
             .setSmallIcon(small != 0 ? small : getApplicationInfo().icon)
             .setContentIntent(open);
         if (Stack.I.state() == Stack.State.ERROR) {
-            b.setContentText("Errore: " + Stack.I.detail()).setOngoing(false).setAutoCancel(true);
+            b.setContentText("Error: " + Stack.I.detail()).setOngoing(false).setAutoCancel(true);
         } else {
-            b.setOngoing(true).addAction(new Notification.Action.Builder(0, "Ferma", stop).build());
+            b.setOngoing(true).addAction(new Notification.Action.Builder(0, "Stop", stop).build());
         }
         return b.build();
     }

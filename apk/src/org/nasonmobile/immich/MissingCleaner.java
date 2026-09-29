@@ -26,8 +26,8 @@ final class MissingCleaner {
     }
 
     static String status(Cfg c) {
-        if (!c.prefs.getBoolean("missing_cleanup", false)) return "Spenta.";
-        return status.isEmpty() ? "Accesa: controlla ogni giorno dopo le 4." : "Ultima: " + status;
+        if (!c.prefs.getBoolean("missing_cleanup", false)) return "Off.";
+        return status.isEmpty() ? "On: checks every day after 4:00." : "Last run: " + status;
     }
 
     /** dal ciclo di Stack: lavora al massimo una volta al giorno, dopo il controllo notturno di Immich */
@@ -42,17 +42,17 @@ final class MissingCleaner {
     }
 
     static synchronized String runNow(Stack stack, Cfg c) {
-        String when = new SimpleDateFormat("dd/MM HH:mm", Locale.ITALY).format(new Date());
+        String when = new SimpleDateFormat("MMM d HH:mm", Locale.US).format(new Date());
         status = when + ", " + doRun(stack, c);
-        stack.note(c, "pulizia delle foto senza file: " + status);
+        stack.note(c, "cleanup of photos whose file is gone: " + status);
         return status;
     }
 
     private static String doRun(Stack stack, Cfg c) {
-        if (stack.state() != Stack.State.RUNNING) return "server non in esecuzione";
-        if (ImmichApi.key(c).isEmpty()) return "serve la chiave API di Immich (sezione \"Elimina l'originale anche da Immich\")";
+        if (stack.state() != Stack.State.RUNNING) return "the server is not running";
+        if (ImmichApi.key(c).isEmpty()) return "the Immich API key is needed (section \"Also delete the original from Immich\")";
         if (c.dcimActive() && !(readable(c.dcimLibrary()) && readable(c.dcimUpload()))) {
-            return "cartelle degli originali non leggibili (permesso Memoria?): nessuna pulizia";
+            return "the folders of the originals are not readable (Storage permission?): no cleanup";
         }
         int missing;
         int total;
@@ -63,21 +63,21 @@ final class MissingCleaner {
             missing = Integer.parseInt(p[0]);
             total = Integer.parseInt(p[1]);
         } catch (Exception e) {
-            return "non riesco a leggere il report di Immich: " + e.getMessage();
+            return "cannot read Immich's report: " + e.getMessage();
         }
-        if (missing == 0) return "nessuna foto senza file";
+        if (missing == 0) return "no photo without its file";
         int limit = Math.max(MIN_LIMIT, total / 10);
         if (missing > limit) {
-            return "mancano " + missing + " file su " + total + ": troppi insieme, pulizia sospesa. Controlla in Immich "
-                + "(Amministrazione → Manutenzione → Report di integrità → File mancanti)";
+            return missing + " of " + total + " files are missing: too many at once, cleanup skipped. Check in Immich "
+                + "(Administration → Maintenance → Integrity Report → Missing Files)";
         }
         try {
             ImmichApi.Reply r = ImmichApi.call(c, "POST", "/jobs", "{\"name\":\"integrity-missing-files-delete-all\"}");
-            if (!r.ok()) return "Immich ha rifiutato la pulizia: " + r.problem();
+            if (!r.ok()) return "Immich refused the cleanup: " + r.problem();
         } catch (IOException e) {
-            return "Immich non risponde: " + e.getMessage();
+            return "Immich is not answering: " + e.getMessage();
         }
-        return missing + (missing == 1 ? " foto senza file spostata" : " foto senza file spostate") + " nel cestino di Immich";
+        return missing + (missing == 1 ? " photo without its file moved" : " photos without their file moved") + " to Immich's trash";
     }
 
     /** cartella montata e leggibile, con il file di controllo che Immich vi tiene (.immich) */

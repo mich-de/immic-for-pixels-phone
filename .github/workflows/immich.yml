@@ -1,21 +1,20 @@
-name: Nuova versione di Immich
+name: New Immich version
 
-# Ogni giorno controlla se Immich ha pubblicato una versione nuova; se sì la compila per Android con gli stessi
-# script che si usano sul PC (pc/build-app.sh + apk/build.sh, senza Docker) e la pubblica come rilascio di questo
-# repository, con lo stesso nome di versione di Immich (es. v3.2.4).
-# Si lancia anche a mano: Actions → "Nuova versione di Immich" → Run workflow.
+# Every day: if Immich has published a new version, build it for Android with the same scripts used on a PC
+# (pc/build-app.sh + apk/build.sh, no Docker) and publish it as a release of this repository, named after the Immich
+# version (e.g. v3.2.4). Can also be started by hand: Actions → "New Immich version" → Run workflow.
 
 on:
   schedule:
-    - cron: "23 4 * * *" # ogni giorno alle 04:23 UTC
+    - cron: "23 4 * * *" # every day at 04:23 UTC
   workflow_dispatch:
     inputs:
       immich_version:
-        description: "Versione di Immich (es. v3.2.4); vuoto = l'ultima pubblicata"
+        description: "Immich version (e.g. v3.2.4); empty = the latest published"
         required: false
         default: ""
       force:
-        description: "Ricompila e sostituisci i file anche se il rilascio esiste già"
+        description: "Rebuild and replace the files even if the release already exists"
         type: boolean
         default: false
 
@@ -28,7 +27,7 @@ concurrency:
 
 jobs:
   controlla:
-    name: Controlla la versione
+    name: Check the version
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.v.outputs.version }}
@@ -36,7 +35,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - id: v
-        name: Ultima versione di Immich e rilasci già fatti
+        name: Latest Immich version and existing releases
         env:
           GH_TOKEN: ${{ github.token }}
           GITHUB_TOKEN: ${{ github.token }}
@@ -48,14 +47,14 @@ jobs:
           v="$(sed -n 's/^immich=//p' <<<"$versions")"
           echo "version=$v" >> "$GITHUB_OUTPUT"
           if gh release view "$v" >/dev/null 2>&1 && [[ "$FORCE" != "true" ]]; then
-            echo "Il rilascio $v esiste già: niente da fare."
+            echo "Release $v already exists: nothing to do."
             echo "build=false" >> "$GITHUB_OUTPUT"
           else
             echo "build=true" >> "$GITHUB_OUTPUT"
           fi
 
   compila:
-    name: Compila e pubblica
+    name: Build and publish
     needs: controlla
     if: needs.controlla.outputs.build == 'true'
     runs-on: ubuntu-latest
@@ -70,13 +69,13 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Spazio su disco
+      - name: Disk space
         run: |
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android/sdk/ndk /opt/ghc /usr/local/.ghcup \
             /usr/share/swift /usr/local/share/boost /opt/hostedtoolcache/CodeQL
           df -h /
 
-      - name: SDK Android (le stesse versioni usate sul PC)
+      - name: Android SDK (same versions as on the PC)
         run: |
           sm="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
           yes | "$sm" --licenses >/dev/null || true
@@ -85,21 +84,21 @@ jobs:
       - uses: actions/cache@v6
         with:
           path: .build/cache
-          key: scaricati-${{ hashFiles('pc/build-app.sh', 'apk/build.sh') }}-${{ env.V }}
+          key: downloads-${{ hashFiles('pc/build-app.sh', 'apk/build.sh') }}-${{ env.V }}
           restore-keys: |
-            scaricati-
+            downloads-
 
-      - name: Chiave di firma
+      - name: Signing key
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
           if [[ -z "$KEYSTORE_BASE64" ]]; then
-            echo "::error::Manca il segreto KEYSTORE_BASE64: la chiave con cui è firmato l'APK già installato (vedi README)"
+            echo "::error::Missing the KEYSTORE_BASE64 secret: the key the installed APKs are signed with (see README)"
             exit 1
           fi
           base64 -d <<<"$KEYSTORE_BASE64" > apk/immich-server.keystore
 
-      - name: Pacchetto Immich (server, web, Node, ffmpeg, VectorChord)
+      - name: Immich package (server, web, Node, ffmpeg, VectorChord)
         env:
           IMMICH_VERSION: ${{ env.V }}
           GITHUB_TOKEN: ${{ github.token }}
@@ -110,7 +109,7 @@ jobs:
           apk/build.sh
           apk/build.sh --lite
 
-      - name: Rilascio
+      - name: Release
         env:
           GH_TOKEN: ${{ github.token }}
           GITHUB_TOKEN: ${{ github.token }}
@@ -119,32 +118,35 @@ jobs:
           versions="$(pc/build-app.sh --versions)"
           pack="dist/immich-android-$V-arm64.tar.gz"
           cat > notes.md <<EOF
-          Server [Immich](https://immich.app) **$V** compilato per Android arm64 da questo repository, senza Docker.
-          Progetto non ufficiale, non affiliato a Immich.
+          [Immich](https://immich.app) server **$V** built for Android arm64 by this repository, without Docker.
+          Made for the Pixel 1–5 (free unlimited Google Photos backup), should run on any arm64 Android phone.
+          Unofficial project, not affiliated with Immich.
 
-          - **immich-server.apk**: l'APK completo. Si installa sopra la versione precedente senza perdere foto e
-            database (stessa firma); al primo avvio il server si aggiorna da solo.
-          - **immich-server-lite.apk** + **$(basename "$pack")**: APK leggero, il pacchetto si copia con adb (vedi README).
+          - **immich-server.apk**: the full APK — this is the one to install. It installs over the previous version
+            without losing photos or database (same signature); on its first start the server updates itself.
+          - **immich-server-lite.apk** + **$(basename "$pack")**: small APK, the package is copied with adb (see README).
 
-          Versioni usate (le stesse dell'immagine Docker ufficiale di Immich $V):
+          Tried it on a phone other than a Pixel 5? Please [open a test report](https://github.com/${{ github.repository }}/issues/new?template=test-report.yml).
+
+          Versions used (the same as Immich's official Docker image for $V):
 
           \`\`\`
           $versions
           \`\`\`
 
-          Sorgenti: [Immich $V](https://github.com/immich-app/immich/tree/$V) · script di compilazione in questo repository.
+          Sources: [Immich $V](https://github.com/immich-app/immich/tree/$V) · build scripts in this repository.
           EOF
           files=(dist/immich-server.apk dist/immich-server-lite.apk "$pack" "$pack.sha256")
           if gh release view "$V" >/dev/null 2>&1; then
             gh release upload "$V" "${files[@]}" --clobber
             gh release edit "$V" --notes-file notes.md
           else
-            gh release create "$V" "${files[@]}" --title "Immich $V per Android" --notes-file notes.md
+            gh release create "$V" "${files[@]}" --title "Immich $V for Android" --notes-file notes.md
           fi
 
-      # Un commit a ogni versione nuova: tiene traccia dell'ultima compilata e tiene attivo il repository
-      # (GitHub sospende le esecuzioni pianificate dopo 60 giorni senza attività).
-      - name: Segna la versione nel repository
+      # One commit per new version: records the latest build and keeps the repository active
+      # (GitHub suspends scheduled runs after 60 days without activity).
+      - name: Record the version in the repository
         run: |
           echo "$V" > ULTIMA_VERSIONE
           git add ULTIMA_VERSIONE
@@ -152,6 +154,6 @@ jobs:
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git commit -m "Immich $V"
-            git pull --rebase origin "${GITHUB_REF_NAME}" # nel frattempo può essere arrivato un altro commit
+            git pull --rebase origin "${GITHUB_REF_NAME}" # another commit may have landed meanwhile
             git push origin "HEAD:${GITHUB_REF_NAME}"
           fi

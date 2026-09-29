@@ -1,0 +1,59 @@
+name: Test report
+description: Tell us how the app runs on your phone (works or not, both help)
+title: "[Test] <phone model>, Android <version>"
+labels: ["test report"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for testing! One report per phone. So far the app has only been tested on a Pixel 5 (Android 14, 8 GB).
+  - type: input
+    id: phone
+    attributes:
+      label: Phone model
+      placeholder: Pixel 3a
+    validations:
+      required: true
+  - type: input
+    id: android
+    attributes:
+      label: Android version and ROM
+      placeholder: Android 12, stock
+    validations:
+      required: true
+  - type: input
+    id: ram
+    attributes:
+      label: RAM
+      placeholder: 4 GB
+  - type: input
+    id: release
+    attributes:
+      label: Release you installed
+      placeholder: v3.2.4
+  - type: dropdown
+    id: result
+    attributes:
+      label: Result
+      options:
+        - Works (setup finished, photos upload and get thumbnails)
+        - Works partly (see details)
+        - The first setup did not finish
+        - Does not install, or the app crashes
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: Details
+      description: >-
+        How long did the first setup take? Do uploads, thumbnails and videos work? Does the server stay up for a day?
+        Did you use the Google Photos options? Anything that went wrong?
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics
+      description: >-
+        Paste the output of **Run diagnostics** and, if something failed, the end of the **Setup** log (both in the
+        app, section "Logs and diagnostics").
+      render: text

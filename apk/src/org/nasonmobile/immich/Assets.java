@@ -40,7 +40,7 @@ final class Assets {
         try {
             return c.getAssets().open(name, AssetManager.ACCESS_STREAMING);
         } catch (FileNotFoundException e) {
-            throw new FileNotFoundException("manca " + name + " (né nell'APK né in " + f + ")");
+            throw new FileNotFoundException("missing " + name + " (neither in the APK nor in " + f + ")");
         }
     }
 

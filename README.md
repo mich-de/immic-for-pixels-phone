@@ -2,12 +2,11 @@
 
 **English** · [Italiano](README.it.md)
 
-An APK that runs **the [Immich](https://immich.app) server** (v3.2.4) directly on an Android phone: a Pixel 5 becomes
+An APK that runs **the [Immich](https://immich.app) server** (v3.2.4) directly on an Android phone: an old Pixel becomes
 your photo and video server. No Docker, no Termux: install the APK, press a button, and a few minutes later the server
 answers on your home network.
 
-Tested on a **Pixel 5 (Android 14, arm64)**. Unofficial project, not affiliated with Immich. The app's own interface is
-in Italian: its buttons are quoted below as they appear, with a translation.
+Tested on a **Pixel 5 (Android 14, arm64)**. Unofficial project, not affiliated with Immich.
 
 Ready-made APKs for every Immich version: [Releases](https://github.com/mich-de/immic-for-pixels-phone/releases)
 (built and published automatically by a GitHub workflow, see [Automatic releases](#automatic-releases-on-github)).
@@ -26,25 +25,48 @@ To just install one, without building anything: [Quick start](#quick-start-just-
 Immich doesn't officially support Android as a server platform: here it is built from source and installed "ad hoc"
 (see [How it works](#how-it-works)).
 
+## Why this exists
+
+This app was made specifically for the **Google Pixel 1–5**. Google Photos gives these phones free, unlimited backup of
+the photos and videos uploaded *from the phone itself*:
+
+| Phone | Free unlimited Google Photos backup |
+|---|---|
+| Pixel / Pixel XL (2016) | Original quality |
+| Pixel 2, Pixel 3 | Storage saver (their Original quality period ended in 2021 and 2022) |
+| Pixel 3a – Pixel 5 | Storage saver (photos up to 16 MP, videos up to 1080p) |
+| Pixel 6 and later | none |
+
+(From [Google Photos Help](https://support.google.com/photos/answer/6220791); Google may change these terms.)
+
+So an old Pixel in a drawer becomes a **private Immich server** for the whole family: your other phones back up their
+originals to Immich on the Pixel, and the Pixel forwards them to Google Photos for free (see
+[Where the photos are, and Google Photos](#where-the-photos-are-and-google-photos)). You get a self-hosted library with
+the full-quality originals, plus a free cloud copy.
+
+**It should work on other phones too.** Nothing in the app depends on the Pixel: any arm64 Android phone can run it as a
+plain Immich server, just without the free Google Photos backup. So far it has only been tested on a Pixel 5 — see
+[Help wanted: testers](#help-wanted-testers).
+
 ## Quick start: just install it
 
 Nothing to build: every Immich version is already built in
 [Releases](https://github.com/mich-de/immic-for-pixels-phone/releases). No PC is needed, except for one setting on
 Android 12–13 (step 3).
 
-1. **On the phone that will be the server** (arm64, Android 8+, at least 6 GB of RAM and several GB free): open the
+1. **On the phone that will be the server** (arm64, Android 8+, several GB free; tested with 8 GB of RAM): open the
    [latest release](https://github.com/mich-de/immic-for-pixels-phone/releases/latest), download `immich-server.apk`
    (~290 MB) and open it. Let the browser install apps when Android asks, and choose *Install anyway* if Play Protect
    says it doesn't know the app.
-2. Open **Immich Server** and press **Installa e avvia** (Install and start). The first time it needs Internet and
-   10–15 minutes: keep the phone on and plugged in. When the status reads **In esecuzione** (Running), the app shows
+2. Open **Immich Server** and press **Install and start**. The first time it needs Internet and 10–15 minutes:
+   keep the phone on and plugged in. When the status reads **Running**, the app shows
    the server address, for example `http://192.168.1.20:2283`.
 3. So that Android doesn't stop the server, in the same screen:
-   - **Escludi dal risparmio batteria** (Exclude from battery optimization) → allow;
-   - **Restrizioni sui processi figli** (Child process restrictions): on Android 14 and later turn on *Settings →
+   - **Exclude from battery optimization** → allow;
+   - **Child process restrictions (Android 12+)**: on Android 14 and later turn on *Settings →
      System → Developer options → Disable child process restrictions* (to show *Developer options*, tap *Build number*
      7 times in *About phone*); on Android 12–13 it needs a PC with adb: the button shows the commands and copies them;
-   - tick *Avvia il server all'accensione del telefono* (Start the server when the phone boots);
+   - tick *Start the server when the phone boots*;
    - on Samsung, Xiaomi and similar phones also let the app run in the background (Samsung: *Never sleeping apps*;
      Xiaomi: *Autostart* and battery saver *No restrictions*).
 4. From any device on the same Wi-Fi open that address in a browser and create the admin account.
@@ -59,9 +81,20 @@ Good to know:
   stay, and the server restarts by itself;
 - **never uninstall the app**: uninstalling deletes all photos and the database (see [Data and backups](#data-and-backups)).
 
+## Help wanted: testers
+
+So far the app has been tested on one phone only: a Pixel 5 (Android 14, 8 GB of RAM). If you try it on anything else —
+especially a **Pixel 1, 2, 3, 3a, 4 or 4a**, or any other arm64 Android phone — please
+[open a test report](https://github.com/mich-de/immic-for-pixels-phone/issues/new?template=test-report.yml), even a
+short one, whether it works or not. Useful to know: phone model, Android version, RAM, whether the first setup finished
+and how long it took, whether uploads, thumbnails and videos work, whether the server stays up for a day, and anything
+that went wrong (the output of **Run diagnostics** and the *Setup* log, both in the app). Phones with 4 GB of RAM
+(Pixel 1–3a) are the biggest unknown.
+
 ## Requirements
 
-- An **arm64** phone with Android 8+ (tested on Android 14), at least 6 GB of RAM, ~5 GB free plus room for the photos.
+- An **arm64** phone with Android 8+, ~5 GB free plus room for the photos. Tested only on Android 14 with 8 GB of RAM:
+  4 GB phones (Pixel 1–3a) should work but are untested — see [Help wanted: testers](#help-wanted-testers).
 - Internet on the first start (the setup downloads Debian packages, about 500 MB).
 - To build the APK yourself: a Linux PC with `git curl tar xz python3`, a JDK and the Android SDK (build-tools,
   `platforms;android-34`). No Docker, no Gradle. Or download a ready APK from Releases.
@@ -93,9 +126,9 @@ apk/install.sh                # installs and prepares Android (see below)
 (or download `immich-server.apk` from [Releases](https://github.com/mich-de/immic-for-pixels-phone/releases) directly
 on the phone; then do the Android settings below from the app's buttons).
 
-On the phone press **Installa e avvia** (Install and start). The first time it extracts Debian and Immich (~40 s),
+On the phone press **Install and start**. The first time it extracts Debian and Immich (~40 s),
 installs PostgreSQL, Valkey and ffmpeg (7–12 min on a Pixel 5) and creates the database; then the status becomes
-**In esecuzione** (Running) and the app shows the address, for example `http://192.168.1.20:2283`. Open it, create the
+**Running** and the app shows the address, for example `http://192.168.1.20:2283`. Open it, create the
 admin user, and in the Immich app on your phone or PC use the same address as the "Server URL".
 
 Later starts take about 40 seconds.
@@ -121,13 +154,13 @@ by hand: `adb install dist/immich-server.apk`, then *Developer options → Disab
 
 - The app keeps a **foreground service** (persistent "Immich Server" notification) with CPU and Wi-Fi wake locks: don't
   close it with "Force stop".
-- Tick *Avvia il server all'accensione del telefono* (Start the server when the phone boots) to restart automatically
+- Tick *Start the server when the phone boots* to restart automatically
   after a reboot. After an **app update** the server restarts by itself (if it was running) in about a minute; if the
   update changes the programs of the Debian system (for example ffmpeg), the first start updates them and takes a few
   minutes and Internet.
 - A phone always charging at 100% wears out its battery. Android doesn't give a normal app (without root) control over
-  charging — no app, this one included, can switch the charger on or off by itself — but the app's *Batteria* (Battery)
-  section can remind you: enable *Avvisami per non tenerlo sempre in carica al 100%* (Remind me not to keep it at 100%),
+  charging — no app, this one included, can switch the charger on or off by itself — but the app's *Battery*
+  section can remind you: enable *Remind me not to keep it charging at 100%*,
   choose the percentage to unplug at (default 80%) and to plug back in at (default 30%), and unplug/replug by hand when
   the notification arrives. Alternatives: a smart plug, or an 80% charge limit if your ROM has one. Keep the phone
   somewhere cool anyway: idle, the server uses little power, but heavy work (thumbnails, video transcoding) heats it up.
@@ -135,8 +168,8 @@ by hand: `adb install dist/immich-server.apk`, then *Developer options → Disab
   included. Without it there is no smart search, face recognition or duplicate detection (*Utilities → Review
   duplicates* finds nothing; *Review large files* works). You can point Immich to an ML server on another PC from its
   settings.
-- **Free space**: below 2 GB the app shows it in yellow in its menu and in the server notification ("spazio in
-  esaurimento", running low); below 500 MB in red ("SPAZIO QUASI FINITO", almost full) — at that point Postgres and the
+- **Free space**: below 2 GB the app shows it in yellow in its menu and in the server notification ("storage
+  running low"); below 500 MB in red ("STORAGE ALMOST FULL") — at that point Postgres and the
   copies can stall. Free some space (for example from the gallery copies, see below) before it runs out.
 
 ## Where the photos are, and Google Photos
@@ -146,15 +179,14 @@ The photos and videos you upload to Immich live in the **app's private storage**
 is in the database). Gallery, Files and Google Photos **can't see them**. To view them use Immich (web or app); to copy
 them to a PC see [Data and backups](#data-and-backups).
 
-To get them into **Google Photos through the Pixel 5**, the app has a *Galleria e Google Foto* (Gallery and Google
-Photos) section: it copies the originals into the phone's gallery, folder `DCIM/Immich`, and from there the Google
+To get them into **Google Photos through the Pixel 5**, the app has a *Gallery and Google Photos*
+section: it copies the originals into the phone's gallery, folder `DCIM/Immich`, and from there the Google
 Photos app can back them up. The originals are copied byte for byte, so the capture date stays the one in the metadata
 (EXIF, or the video's creation date); for files without metadata (screenshots, PNG) Android uses the date of the copy.
 
-1. Press *Immagine di prova* (Test image): an «Immich» folder with a test image appears in the gallery.
+1. Press *Test image*: an «Immich» folder with a test image appears in the gallery.
 2. In Google Photos: *Settings → Backup → Back up device folders* and turn on «Immich» (once).
-3. Tick *Copia automaticamente le foto nuove nella galleria* (Copy new photos to the gallery automatically, every 5
-   minutes), or use *Copia ora* (Copy now).
+3. Tick *Copy new photos to the gallery automatically* (every 5 minutes), or use *Copy now*.
 
 Notes: only the admin's photos are copied (the other users' only if you tick that option, so as not to mix their
 albums into your Google Photos) and never Immich's «locked» ones. On a Pixel 5 Google Photos' free unlimited storage is
@@ -164,18 +196,16 @@ the «Immich» folder in the Immich app**: it would send those files back to the
 ### No second copy: the gallery copy is temporary
 
 Google Photos can only upload files from shared storage, so one copy on the phone is unavoidable, but it doesn't have
-to stay. The app **deletes it by itself** after the chosen time (*Elimina la copia in galleria dopo*, delete the
-gallery copy after: never / 3 / 5 / **7** / 30 days). The original stays in Immich and, once Google Photos has uploaded
+to stay. The app **deletes it by itself** after the chosen time (*Delete the gallery copy after*: never / 3 / 5 /
+**7** / 30 days). The original stays in Immich and, once Google Photos has uploaded
 it, in the cloud too. So the lasting cost on the phone is only Immich: the gallery copies are a short queue of a few
 days.
 
-- **Cap** (*Copie in galleria in attesa di backup: al massimo*, gallery copies waiting for backup, at most: none / 5 /
-  **10** / 20 / 50 GB): avoids suddenly doubling a large library. When the cap is reached the copy pauses, and resumes
+- **Cap** (*Gallery copies waiting for backup: at most*: none / 5 / **10** / 20 / 50 GB): avoids suddenly doubling a large library. When the cap is reached the copy pauses, and resumes
   when old copies are deleted — keep an eye on the free space anyway.
 - Google Photos' **Free up space** deletes right away the copies it has already uploaded; the app notices and resumes
   copying.
-- *Elimina ora le copie in galleria* (Delete the gallery copies now) removes them all (the photos stay in Immich);
-  *Elimina e ricopia da capo* (Delete and copy again) also restarts the copy from all the photos.
+- *Delete the gallery copies now* removes them all (the photos stay in Immich); *Delete and copy again* also restarts the copy from all the photos.
 - Google Photos doesn't tell when it has finished uploading, so the expiry is a time, not an event. If Google Photos'
   backup stays off past the expiry, the copy is deleted before being uploaded: raise the days or check the backup.
 - Photos taken with the Pixel and uploaded to Immich by its own app are already in the gallery and in Google Photos: no
@@ -188,11 +218,9 @@ original from Immich some days after it was copied to the gallery. **This is per
 left is the (compressed) one Google Photos uploaded, not the original.
 
 To turn it on, in the same section of the app:
-1. In Immich: *Account Settings → API Keys → New API Key*, with the `asset.delete` permission. Copy it.
-2. Paste it into *Chiave API di Immich* (Immich API key) and press *Salva la chiave* (Save the key); *Prova la chiave*
-   (Test the key) checks that it works without deleting anything.
-3. Choose *Elimina l'originale da Immich dopo* (Delete the original from Immich after): **Mai** (Never, the default),
-   2, 3, 5 or 7 days.
+1. In Immich: *Account Settings → API Keys → New API Key*, with the `all` (or `asset.delete`) permission. Copy it.
+2. Paste it into *Immich API key* and press *Save the key*; *Test the key* checks that it works without deleting anything.
+3. Choose *Delete the original from Immich after*: **Never (default)**, 2, 3, 5 or 7 days.
 
 It only deletes assets that were already copied to the gallery successfully (it never touches a file the app couldn't
 copy, for example a format Android doesn't support); it uses Immich's API, not direct database access, so Immich itself
@@ -217,18 +245,19 @@ Photos see them directly, with no temporary copies:
 | `/data/upload` (just uploaded) | `DCIM/.immich-upload` (hidden: Android doesn't index it) |
 | `/data/library` (sorted by Immich) | `DCIM/Immich/<user>/<original name>` (the admin's folder is `admin`) |
 
-Turn on *Salva gli originali in DCIM/Immich* (Save the originals in DCIM/Immich): the app asks for the *Storage*
+Turn on *Keep the originals in DCIM/Immich*: the app asks for the *Storage*
 permission, restarts the server and moves the photos already uploaded (a few minutes; it resumes if interrupted). It
 sets Immich's storage template to `{{filename}}` — one folder per user, because Google Photos backs up folder by folder,
 and Immich's own `upload/xx/yy` layout would show up as hundreds of folders — and Immich moves each new photo from
 `upload` to `library` right after reading its metadata. Both folders are on the same storage, so that move is an instant
-rename and Google Photos never sees a half-written file. Thumbnails, transcoded videos, database and backups stay
-private. In Google Photos turn on the backup of the `admin` folder once (*Settings → Backup → Back up device folders*).
+rename and Google Photos never sees a half-written file. Android doesn't index a file that arrives by renaming out of
+a hidden folder, so the app asks it to scan each original that lands in `DCIM/Immich` (checked every 5 minutes).
+Thumbnails, transcoded videos, database and backups stay private. In Google Photos turn on the backup of the `admin` folder once (*Settings → Backup → Back up device folders*).
 
 Good to know:
 - other apps can now delete the originals, for example Google Photos' *Free up space* after its backup: Immich then
   keeps the photo (thumbnail) without its original — see the cleanup below;
-- the gallery copy (*Galleria e Google Foto*) isn't needed anymore: with this option the app makes no copies and only
+- the gallery copy (*Gallery and Google Photos*) isn't needed anymore: with this option the app makes no copies and only
   records when each original lands in `DCIM/Immich`, which is when *Delete the original from Immich after* starts
   counting;
 - motion photos: the video part Immich extracts from them would land there too, as a separate short video;
@@ -241,18 +270,18 @@ Good to know:
 
 Every night at 3:00 Immich checks which originals in its database no longer exist on disk (*Administration →
 Maintenance → Integrity Report → Missing Files*); the *Delete All* button there moves those photos to Immich's trash
-(recoverable for 30 days, then Immich deletes them). With *Ogni notte sposta nel cestino di Immich le foto il cui file non
-c'è più* (Every night move to Immich's trash the photos whose file is gone) the app presses that button by itself once a
+(recoverable for 30 days, then Immich deletes them). With *Every night move to Immich's trash the photos whose file is
+gone* the app presses that button by itself once a
 day after 4:00, with the API key above (it needs the `all` permission, or the one for jobs). It does nothing if the
 folders of the originals aren't readable (storage permission revoked: every photo would look missing) or if too many
-are missing at once (more than 20 and more than 10%): better to look first. *Controlla ora* (Check now) runs it right
+are missing at once (more than 20 and more than 10%): better to look first. *Check now* runs it right
 away. The caveat about photos coming from another phone applies here too: once a photo leaves Immich's trash, that
 phone uploads it again if it still has it.
 
 ## Diagnostics, logs and recovery
 
-In the app, **Esegui diagnosi** (Run diagnostics) checks proot, Debian, Node, `sharp` (thumbnails), ffmpeg and
-exiftool with real tests and writes `files/immich/logs/diagnosi.txt`. The menu above the box shows the setup,
+In the app, **Run diagnostics** checks proot, Debian, Node, `sharp` (thumbnails), ffmpeg and
+exiftool with real tests and writes `files/immich/logs/diagnostics.txt`. The menu above the box shows the setup,
 PostgreSQL, Valkey and Immich logs.
 
 From a PC (the app is debuggable, so `run-as` works without root, even with the phone locked):
@@ -272,14 +301,14 @@ adb shell am start -n org.nasonmobile.immich/.MainActivity --ez missing_cleanup_
 
 | Symptom | What to do |
 |---|---|
-| Hangs while starting proot | *Avanzate → proot senza seccomp* (Advanced → proot without seccomp; the app already tries it once by itself) |
+| Hangs while starting proot | *Advanced → proot without seccomp* (the app already tries it once by itself) |
 | The server stops after a while | check *child process restrictions* and *battery optimization* in the app |
-| Setup interrupted halfway | press *Installa e avvia* again: it resumes from the right point |
-| Broken Debian or packages | *Ripara* (Repair): reinstalls Debian and the Immich app, **database and photos stay** |
+| Setup interrupted halfway | press *Install and start* again: it resumes from the right point |
+| Broken Debian or packages | *Repair*: reinstalls Debian and the Immich app, **database and photos stay** |
 | Photos or videos without a thumbnail after the app was force-closed | jobs lost by APKs older than 2026-09-24 (Valkey without AOF): in Immich *Administration → Jobs*: *Extract metadata → Missing*, then *Generate Thumbnails → Missing* |
 | Videos without a thumbnail, "Error loading image" | HDR videos with an ffmpeg lacking `tonemapx` (APKs older than 2026-09-23): update the APK, then in Immich *Administration → Jobs*: *Generate Thumbnails → Missing* and *Transcode videos → Missing* |
 | The ImageMagick field of Immich's server information is empty | APKs older than 2026-09-28: that Debian had no ImageMagick (informational only, Immich doesn't use it otherwise). Update the APK |
-| Running out of space | *Elimina ora le copie in galleria*, lower the cap or the days of the gallery copy, or delete from the phone backup (`ImmichBackup`) what you have saved elsewhere; on the server: *Utilities → Review large files*, then *Empty trash* (deleted assets only free space once the trash is emptied, or after 30 days) |
+| Running out of space | *Delete the gallery copies now*, lower the cap or the days of the gallery copy, or delete from the phone backup (`ImmichBackup`) what you have saved elsewhere; on the server: *Utilities → Review large files*, then *Empty trash* (deleted assets only free space once the trash is emptied, or after 30 days) |
 
 ## Updating Immich
 
@@ -359,9 +388,9 @@ adb exec-out run-as org.nasonmobile.immich tar cf - -C files/immich library > li
 
 ### Backup on the phone (no PC)
 
-The app's *Backup sul telefono* (Backup on the phone) section copies the originals (not the thumbnails) into a normal
+The app's *Backup on the phone* section copies the originals (not the thumbnails) into a normal
 folder of the phone's shared storage, **`ImmichBackup`**: any file manager sees it, and so does a PC when the phone is
-connected like a USB drive, no adb needed. It's manual (*Copia ora sul telefono*, Copy to the phone now) and
+connected like a USB drive, no adb needed. It's manual (*Copy to the phone now*) and
 incremental: it skips files already there with the same size, so it can be stopped and restarted without copying
 everything again. It never deletes anything at the destination, not even when the original has been removed from
 Immich. The first time it asks for Android's *Storage* permission: the app needs it to write outside its private folder.
@@ -432,6 +461,10 @@ Tested on the Pixel 5 (Android 14, AOSP build with a custom 4.19 kernel, 7.5 GB 
   (the *schema drift* warning about `geodata_places` during the import is transient: once it's done the indexes are
   there);
 - ImageMagick inside Debian (`magick --version` in Immich's own environment, 2026-09-28);
+- originals moved into `DCIM/Immich` with *Keep the originals in DCIM/Immich* (2026-09-29): 395 files (9.96 GB) moved
+  in about 2 minutes, then Immich's storage template migration renamed the 383 photos to `DCIM/Immich/admin/<original
+  name>`; SHA-1 of all 383 checked against Immich's database (all identical); Android indexed them only after an
+  explicit media scan, which the app now requests by itself;
 - idle, the whole stack uses roughly 0.7–1 GB of RAM.
 
 The tar extractor is checked on the PC against GNU tar. Not tested yet: long-term use (battery, temperature, memory under

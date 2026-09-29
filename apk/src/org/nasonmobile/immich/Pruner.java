@@ -42,7 +42,7 @@ final class Pruner {
     }
 
     static String status() {
-        return status.isEmpty() ? "Non attivo." : status;
+        return status.isEmpty() ? "Off." : status;
     }
 
     private static File exportedFile(Cfg c) {
@@ -84,8 +84,8 @@ final class Pruner {
         try {
             doRun(c);
         } catch (Throwable t) {
-            Log.w(Cfg.TAG, "pulizia Immich: " + t);
-            status = "Eliminazione da Immich: errore — " + t.getMessage();
+            Log.w(Cfg.TAG, "Immich pruning: " + t);
+            status = "Deleting from Immich: error — " + t.getMessage();
         }
     }
 
@@ -96,7 +96,7 @@ final class Pruner {
 
         File exp = exportedFile(c);
         if (!exp.isFile()) {
-            status = "Nessuna risorsa ancora copiata nella galleria: niente da eliminare.";
+            status = "No asset copied to the gallery yet: nothing to delete.";
             return;
         }
         long cutoff = System.currentTimeMillis() - days * 86_400_000L;
@@ -113,7 +113,7 @@ final class Pruner {
             }
         }
         if (due.isEmpty()) {
-            status = "Nessuna risorsa da eliminare da Immich per ora.";
+            status = "Nothing to delete from Immich for now.";
             return;
         }
 
@@ -122,14 +122,14 @@ final class Pruner {
             List<String> batch = due.subList(i, Math.min(i + 50, due.size()));
             String err = deleteBatch(c, apiKey, batch);
             if (err != null) {
-                status = "Eliminazione da Immich: " + err + " (" + ok + " eliminate prima dell'errore)";
+                status = "Deleting from Immich: " + err + " (" + ok + " deleted before the error)";
                 appendPruned(c, batch.subList(0, 0)); // niente da segnare: il lotto è fallito
                 return;
             }
             appendPruned(c, batch);
             ok += batch.size();
         }
-        status = "Eliminate per sempre da Immich " + ok + " risorse (copiate da almeno " + days + " giorni).";
+        status = "Permanently deleted " + ok + " assets from Immich (copied at least " + days + " days ago).";
     }
 
     private static void appendPruned(Cfg c, List<String> ids) throws IOException {
@@ -161,9 +161,9 @@ final class Pruner {
             int rc = h.getResponseCode();
             if (rc == 204 || rc == 200) return null;
             String detail = readBody(rc >= 400 ? h.getErrorStream() : h.getInputStream());
-            if (rc == 401) return "chiave API non valida o scaduta";
-            if (rc == 403) return "la chiave API non ha il permesso \"Elimina risorse\" (asset.delete)";
-            return "risposta " + rc + (detail.isEmpty() ? "" : ": " + detail);
+            if (rc == 401) return "API key not valid or expired";
+            if (rc == 403) return "the API key lacks the asset.delete permission";
+            return "response " + rc + (detail.isEmpty() ? "" : ": " + detail);
         } catch (Exception e) {
             return e.getMessage();
         } finally {
@@ -195,12 +195,12 @@ final class Pruner {
             if (rc == 200) {
                 String body = readBody(h.getInputStream());
                 JSONObject j = new JSONObject(body);
-                return "ok: chiave valida per l'utente " + j.optString("email", "?");
+                return "ok: valid key for user " + j.optString("email", "?");
             }
-            if (rc == 401) return "chiave API non valida";
-            return "risposta inattesa: " + rc;
+            if (rc == 401) return "API key not valid";
+            return "unexpected response: " + rc;
         } catch (Exception e) {
-            return "errore: " + e.getMessage();
+            return "error: " + e.getMessage();
         } finally {
             if (h != null) h.disconnect();
         }

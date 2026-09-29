@@ -35,10 +35,10 @@ final class DcimMode {
     static String status(Cfg c) {
         if (!status.isEmpty()) return status;
         if (c.dcimActive()) {
-            return c.dcimWanted() ? "Attivo: gli originali stanno in " + c.dcimLibrary() + "/<utente>."
-                : "Spento: le foto nuove restano nella cartella nascosta DCIM/.immich-upload (quelle già in DCIM/Immich restano lì).";
+            return c.dcimWanted() ? "On: the originals are in " + c.dcimLibrary() + "/<user>."
+                : "Off: new photos stay in the hidden folder DCIM/.immich-upload (the ones already in DCIM/Immich stay there).";
         }
-        return c.dcimWanted() ? "Da fare: gli originali si spostano al prossimo avvio del server." : "Spento.";
+        return c.dcimWanted() ? "Pending: the originals move at the next server start." : "Off.";
     }
 
     private static File inProgress(Cfg c) {
@@ -50,7 +50,7 @@ final class DcimMode {
         try {
             Util.mkdirs(c.dcimUpload());
             Util.mkdirs(c.dcimLibrary());
-            File t = new File(c.dcimUpload(), ".prova-" + System.nanoTime());
+            File t = new File(c.dcimUpload(), ".probe-" + System.nanoTime());
             try (FileOutputStream o = new FileOutputStream(t)) {
                 o.write('1');
             }
@@ -64,8 +64,8 @@ final class DcimMode {
     static void prepare(Stack stack, Cfg c) throws Exception {
         if (c.dcimActive()) {
             if (!canUse(c)) {
-                throw new IOException("gli originali sono in DCIM/Immich ma l'app non riesce più a leggerli: ridai il permesso "
-                    + "Memoria (Impostazioni → App → Immich Server → Autorizzazioni) e riavvia il server");
+                throw new IOException("the originals are in DCIM/Immich but the app can no longer read them: grant the Storage permission again "
+                    + "(Settings → Apps → Immich Server → Permissions) and restart the server");
             }
             status = "";
             return;
@@ -74,16 +74,16 @@ final class DcimMode {
         if (!c.dcimWanted() && !resume) return;
         if (!canUse(c)) {
             if (resume) {
-                throw new IOException("lo spostamento degli originali in DCIM è a metà e manca il permesso Memoria: ridallo "
-                    + "(Impostazioni → App → Immich Server → Autorizzazioni) e riavvia il server");
+                throw new IOException("moving the originals to DCIM is half done and the Storage permission is missing: grant it again "
+                    + "(Settings → Apps → Immich Server → Permissions) and restart the server");
             }
-            status = "Manca il permesso Memoria: gli originali restano nella cartella privata. Concedilo e riavvia il server.";
-            stack.note(c, "originali in DCIM: " + status);
+            status = "Storage permission missing: the originals stay in the private folder. Grant it and restart the server.";
+            stack.note(c, "originals in DCIM: " + status);
             return;
         }
 
         Util.touch(inProgress(c));
-        stack.note(c, "originali in DCIM: " + (resume ? "riprendo lo spostamento" : "sposto gli originali nella memoria condivisa"));
+        stack.note(c, "originals in DCIM: " + (resume ? "resuming the move" : "moving the originals to shared storage"));
         // le copie temporanee per Google Foto non servono più, e dentro DCIM/Immich sarebbero file estranei per Immich
         Exporter.cleanup(c, true);
         File nomedia = new File(c.dcimUpload(), ".nomedia");
@@ -101,7 +101,7 @@ final class DcimMode {
         // dopo l'avvio Immich deve portare in DCIM/Immich anche le foto già caricate (vedi afterStart)
         c.prefs.edit().putBoolean("dcim_migrate_existing", true).apply();
         status = "";
-        stack.note(c, "originali in DCIM: spostati " + n.files + " file (" + (n.bytes >> 20) + " MB)");
+        stack.note(c, "originals in DCIM: moved " + n.files + " files (" + (n.bytes >> 20) + " MB)");
     }
 
     private static final class Moved {
@@ -152,19 +152,19 @@ final class DcimMode {
                 copy(k, part);
                 if (part.length() != size) {
                     part.delete();
-                    throw new IOException("copia incompleta di " + k);
+                    throw new IOException("incomplete copy of " + k);
                 }
                 part.setLastModified(k.lastModified());
-                if (out.exists() && !out.delete()) throw new IOException("non riesco a sostituire " + out);
-                if (!part.renameTo(out)) throw new IOException("non riesco a rinominare " + part);
+                if (out.exists() && !out.delete()) throw new IOException("cannot replace " + out);
+                if (!part.renameTo(out)) throw new IOException("cannot rename " + part);
             }
-            if (!k.delete()) throw new IOException("non riesco a togliere " + k + " dopo averlo copiato");
+            if (!k.delete()) throw new IOException("cannot remove " + k + " after copying it");
             n.files++;
             n.bytes += size;
             if (n.files % 20 == 0 || n.files == n.totalFiles) {
                 int pct = n.totalBytes > 0 ? (int) (n.bytes * 100 / n.totalBytes) : 100;
-                stack.installing(pct, "Sposto gli originali in DCIM: " + n.files + " di " + n.totalFiles + " file ("
-                    + (n.bytes >> 20) + " di " + (n.totalBytes >> 20) + " MB)…");
+                stack.installing(pct, "Moving the originals to DCIM: " + n.files + " of " + n.totalFiles + " files ("
+                    + (n.bytes >> 20) + " of " + (n.totalBytes >> 20) + " MB)…");
             }
         }
     }
@@ -185,8 +185,8 @@ final class DcimMode {
     static void afterStart(Cfg c) {
         if (!c.dcimActive() || !c.dcimWanted() || !c.prefs.getBoolean("dcim_migrate_existing", false)) return;
         if (ImmichApi.key(c).isEmpty()) {
-            status = "Per portare in DCIM/Immich anche le foto già caricate: in Immich Amministrazione → Processi → "
-                + "Migrazione modello archiviazione → Avvia (oppure salva la chiave API qui sotto).";
+            status = "To move the photos already uploaded to DCIM/Immich too: in Immich Administration → Jobs → "
+                + "Storage template migration → Start (or save the API key below).";
             return;
         }
         try {
@@ -195,10 +195,10 @@ final class DcimMode {
                 c.prefs.edit().putBoolean("dcim_migrate_existing", false).apply();
                 status = "";
             } else {
-                status = "Migrazione delle foto già caricate non avviata: " + r.problem();
+                status = "Migration of the photos already uploaded not started: " + r.problem();
             }
         } catch (IOException e) {
-            status = "Migrazione delle foto già caricate non avviata: " + e.getMessage();
+            status = "Migration of the photos already uploaded not started: " + e.getMessage();
         }
     }
 

@@ -73,8 +73,8 @@ final class Tar {
 
         @Override
         public String toString() {
-            return files + " file, " + dirs + " cartelle, " + symlinks + " symlink, " + hardlinks + " hardlink ("
-                + hardlinksCopied + " copiati), " + skipped + " ignorati";
+            return files + " files, " + dirs + " folders, " + symlinks + " symlinks, " + hardlinks + " hard links ("
+                + hardlinksCopied + " copied), " + skipped + " skipped";
         }
     }
 
@@ -183,7 +183,7 @@ final class Tar {
                         long left = size;
                         while (left > 0) {
                             int n = in.read(buf, 0, (int) Math.min(buf.length, left));
-                            if (n < 0) throw new IOException("tar troncato: " + rel);
+                            if (n < 0) throw new IOException("truncated tar: " + rel);
                             os.write(buf, 0, n);
                             left -= n;
                         }
@@ -203,7 +203,7 @@ final class Tar {
                     mkdirs(f.getParentFile(), madeDirs);
                     deleteIfExists(f);
                     String targetRel = map(link, strip);
-                    if (targetRel == null) throw new IOException("hardlink senza destinazione: " + rel);
+                    if (targetRel == null) throw new IOException("hard link without a target: " + rel);
                     File target = new File(dest, targetRel);
                     try {
                         ops.hardlink(target, f);
@@ -244,7 +244,7 @@ final class Tar {
             int n = in.read(b, off, b.length - off);
             if (n < 0) {
                 if (off == 0) return false;
-                throw new IOException("tar troncato (blocco parziale)");
+                throw new IOException("truncated tar (partial block)");
             }
             off += n;
         }
@@ -252,12 +252,12 @@ final class Tar {
     }
 
     private static byte[] readBytes(InputStream in, long size) throws IOException {
-        if (size > 16 * 1024 * 1024) throw new IOException("header tar troppo grande");
+        if (size > 16 * 1024 * 1024) throw new IOException("tar header too large");
         byte[] b = new byte[(int) size];
         int off = 0;
         while (off < b.length) {
             int n = in.read(b, off, b.length - off);
-            if (n < 0) throw new IOException("tar troncato");
+            if (n < 0) throw new IOException("truncated tar");
             off += n;
         }
         return b;
@@ -270,7 +270,7 @@ final class Tar {
             if (s <= 0) {
                 if (tmp == null) tmp = new byte[8192];
                 int r = in.read(tmp, 0, (int) Math.min(tmp.length, n));
-                if (r < 0) throw new IOException("tar troncato");
+                if (r < 0) throw new IOException("truncated tar");
                 s = r;
             }
             n -= s;
@@ -347,7 +347,7 @@ final class Tar {
         int skipped = 0;
         for (String p : name.split("/")) {
             if (p.isEmpty() || p.equals(".")) continue;
-            if (p.equals("..")) throw new IOException("percorso non sicuro nel tar: " + name);
+            if (p.equals("..")) throw new IOException("unsafe path in tar: " + name);
             if (skipped < strip) {
                 skipped++;
                 continue;
@@ -361,7 +361,7 @@ final class Tar {
         if (d == null) return;
         String key = d.getPath();
         if (made.contains(key)) return;
-        if (!d.isDirectory() && !d.mkdirs() && !d.isDirectory()) throw new IOException("impossibile creare " + d);
+        if (!d.isDirectory() && !d.mkdirs() && !d.isDirectory()) throw new IOException("cannot create " + d);
         made.add(key);
     }
 

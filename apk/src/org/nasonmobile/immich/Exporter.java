@@ -10,6 +10,7 @@ import android.graphics.Color;
 import android.graphics.LinearGradient;
 import android.graphics.Paint;
 import android.graphics.Shader;
+import android.media.MediaScannerConnection;
 import android.net.Uri;
 import android.os.Build;
 import android.provider.MediaStore;
@@ -67,7 +68,7 @@ final class Exporter {
     }
 
     static String status() {
-        return status.isEmpty() ? "Nessuna copia eseguita finora." : status;
+        return status.isEmpty() ? "No copy made so far." : status;
     }
 
     // ------------------------------------------------------------------ giro di copia
@@ -79,17 +80,17 @@ final class Exporter {
         try {
             doRun(stack, c);
         } catch (InterruptedException e) {
-            status = "Copia interrotta.";
+            status = "Copy interrupted.";
         } catch (Throwable t) {
-            Log.w(Cfg.TAG, "esportazione: " + t);
-            status = "Copia nella galleria: errore — " + t.getMessage();
+            Log.w(Cfg.TAG, "gallery export: " + t);
+            status = "Gallery copy: error — " + t.getMessage();
         } finally {
             running = false;
         }
     }
 
     private static void doRun(Stack stack, Cfg c) throws Exception {
-        if (Build.VERSION.SDK_INT < 29) throw new IOException("serve Android 10 o successivo");
+        if (Build.VERSION.SDK_INT < 29) throw new IOException("needs Android 10 or later");
         cleanup(c, false);
 
         File dir = new File(c.home, "export");
@@ -139,7 +140,7 @@ final class Exporter {
                         capped = true;
                         break outer;
                     }
-                    status = "Copio nella galleria: " + (copied + skipped + 1) + " — " + r.optString("name");
+                    status = "Copying to the gallery: " + (copied + skipped + 1) + " — " + r.optString("name");
                     Uri u = src == null ? null : copyOne(c, r, src);
                     if (u != null) {
                         long now = System.currentTimeMillis();
@@ -163,33 +164,37 @@ final class Exporter {
         }
         if (capped) Util.write(wmFile, wm + "\t" + lastId + "\n"); // riprende da qui
 
-        String when = new SimpleDateFormat("HH:mm", Locale.ITALY).format(new Date());
+        String when = new SimpleDateFormat("HH:mm", Locale.US).format(new Date());
         status = capped
-            ? "In pausa alle " + when + ": raggiunto il tetto di " + capGb + " GB di copie in galleria. Riprende quando le "
-                + "copie vecchie vengono eliminate (o se alzi il tetto)."
-            : "Ultimo controllo alle " + when + ": " + copied + " copiati ora, " + done.size() + " in totale"
-                + (skipped > 0 ? " (" + skipped + " saltati: file mancante o formato non supportato)" : "") + ".";
+            ? "Paused at " + when + ": reached the cap of " + capGb + " GB of gallery copies. It resumes when the "
+                + "old copies are deleted (or if you raise the cap)."
+            : "Last check at " + when + ": " + copied + " copied now, " + done.size() + " in total"
+                + (skipped > 0 ? " (" + skipped + " skipped: missing file or unsupported format)" : "") + ".";
     }
 
     /**
      * Originali in DCIM (DcimMode): nessuna copia, Google Foto li vede già. Si annota solo quando ciascuno è arrivato
      * in DCIM/Immich (Immich ce lo sposta dopo averne letto i metadati): è il momento da cui Pruner conta i giorni.
+     * E si chiede ad Android di indicizzarlo: arrivato per rinomina da una cartella nascosta, da solo non lo vedrebbe
+     * (verificato sul Pixel 5: 0 file su 383 in Galleria finché non li si fa scansionare).
      */
     private static void trackDcim(Stack stack, Cfg c, File doneFile) throws Exception {
-        Set<String> done = new HashSet<>();
-        if (doneFile.isFile()) {
-            for (String l : Util.read(doneFile).split("\n")) {
-                if (!l.isEmpty()) done.add(l);
-            }
-        }
-        String out = stack.query(c, "SELECT a.id FROM asset a WHERE a.\"deletedAt\" IS NULL "
+        Set<String> done = readSet(doneFile);
+        File scannedFile = new File(doneFile.getParentFile(), "scanned.txt");
+        Set<String> scanned = readSet(scannedFile);
+        String out = stack.query(c, "SELECT a.id || ' ' || a.\"originalPath\" FROM asset a WHERE a.\"deletedAt\" IS NULL "
             + "AND a.\"originalPath\" LIKE '/data/library/%'");
         long now = System.currentTimeMillis();
         int inDcim = 0;
         int added = 0;
+        List<String> toScan = new ArrayList<>();
+        List<String> toScanIds = new ArrayList<>();
         try (FileWriter w = new FileWriter(doneFile, true)) {
             for (String line : out.split("\n")) {
-                String id = line.trim();
+                line = line.trim();
+                int sp = line.indexOf(' ');
+                if (sp != 36) continue;
+                String id = line.substring(0, sp);
                 if (!id.matches("[0-9a-f-]{36}")) continue;
                 inDcim++;
                 if (done.add(id)) {
@@ -197,11 +202,31 @@ final class Exporter {
                     w.write(id + "\n");
                     added++;
                 }
+                if (!scanned.contains(id)) {
+                    toScan.add(c.hostPath(line.substring(sp + 1)).getPath());
+                    toScanIds.add(id);
+                }
             }
         }
-        String when = new SimpleDateFormat("HH:mm", Locale.ITALY).format(new Date());
-        status = "Originali in DCIM/Immich: niente copie, Google Foto li vede direttamente. Ultimo controllo alle " + when
-            + ": " + inDcim + " foto in DCIM" + (added > 0 ? " (" + added + " arrivate ora)" : "") + ".";
+        if (!toScan.isEmpty()) {
+            MediaScannerConnection.scanFile(c.ctx, toScan.toArray(new String[0]), null, null);
+            try (FileWriter w = new FileWriter(scannedFile, true)) {
+                for (String id : toScanIds) w.write(id + "\n");
+            }
+        }
+        String when = new SimpleDateFormat("HH:mm", Locale.US).format(new Date());
+        status = "Originals in DCIM/Immich: no copies, Google Photos sees them directly. Last check at " + when
+            + ": " + inDcim + " photos in DCIM" + (added > 0 ? " (" + added + " just arrived)" : "") + ".";
+    }
+
+    private static Set<String> readSet(File f) throws IOException {
+        Set<String> s = new HashSet<>();
+        if (f.isFile()) {
+            for (String l : Util.read(f).split("\n")) {
+                if (!l.isEmpty()) s.add(l);
+            }
+        }
+        return s;
     }
 
     private static String sqlNew(String wm, String lastId, boolean allUsers) {
@@ -284,9 +309,9 @@ final class Exporter {
         v.put(MediaStore.MediaColumns.IS_PENDING, 1);
         if (takenMs > 0) v.put(MediaStore.MediaColumns.DATE_TAKEN, takenMs); // suggerimento: la scansione può sostituirlo
         Uri uri = cr.insert(collection, v);
-        if (uri == null) throw new IOException("MediaStore ha rifiutato " + name);
+        if (uri == null) throw new IOException("MediaStore refused " + name);
         try (InputStream in = new FileInputStream(src); OutputStream out = cr.openOutputStream(uri)) {
-            if (out == null) throw new IOException("impossibile scrivere " + name);
+            if (out == null) throw new IOException("cannot write " + name);
             byte[] b = new byte[1 << 16];
             int n;
             while ((n = in.read(b)) > 0) out.write(b, 0, n);
@@ -323,7 +348,7 @@ final class Exporter {
                 l.add(s);
             }
         } catch (Exception e) {
-            Log.w(Cfg.TAG, "staged.tsv illeggibile: " + e);
+            Log.w(Cfg.TAG, "staged.tsv not readable: " + e);
         }
         return l;
     }
@@ -362,8 +387,8 @@ final class Exporter {
             }
         }
         int days = c.prefs.getInt("export_keep_days", 7);
-        return "Copie in galleria ora: " + n + " file, " + (sum >> 20) + " MB"
-            + (days > 0 ? " (eliminate dopo " + days + " giorni)." : " (non vengono eliminate).");
+        return "Gallery copies now: " + n + " files, " + (sum >> 20) + " MB"
+            + (days > 0 ? " (deleted after " + days + " days)." : " (never deleted).");
     }
 
     private static boolean exists(ContentResolver cr, String uri) {
@@ -391,7 +416,7 @@ final class Exporter {
                     try {
                         removed += cr.delete(Uri.parse(s.uri), null, null);
                     } catch (Exception e) {
-                        Log.w(Cfg.TAG, "copia non eliminata (" + s.uri + "): " + e);
+                        Log.w(Cfg.TAG, "copy not deleted (" + s.uri + "): " + e);
                     }
                 } else if (exists(cr, s.uri)) {
                     keep.add(s);
@@ -400,10 +425,10 @@ final class Exporter {
             try {
                 saveStaged(c, keep);
             } catch (IOException e) {
-                Log.w(Cfg.TAG, "staged.tsv non salvato: " + e);
+                Log.w(Cfg.TAG, "staged.tsv not saved: " + e);
             }
         }
-        if (removed > 0) Log.i(Cfg.TAG, "copie in galleria eliminate: " + removed);
+        if (removed > 0) Log.i(Cfg.TAG, "gallery copies deleted: " + removed);
         return removed;
     }
 
@@ -432,8 +457,8 @@ final class Exporter {
             else if (mime(r.optString("name", src.getName()), "VIDEO".equals(r.optString("type"))) == null) unsupported++;
             else ok++;
         }
-        return rows.size() + " risorse trovate (al massimo " + BATCH + " per giro): " + ok + " copiabili, " + missing
-            + " senza file, " + unsupported + " con formato non supportato";
+        return rows.size() + " assets found (at most " + BATCH + " per round): " + ok + " can be copied, " + missing
+            + " without a file, " + unsupported + " with an unsupported format";
     }
 
     /** Immagine di prova (senza toccare il server): serve a vedere la cartella in Galleria e in Google Foto. */
@@ -443,7 +468,7 @@ final class Exporter {
 
     /** {@code stagedTs}: da quando conta la copia per la scadenza (parametro per poter provare l'eliminazione) */
     static String testImage(Cfg c, long takenMs, long stagedTs) throws IOException {
-        if (Build.VERSION.SDK_INT < 29) throw new IOException("serve Android 10 o successivo");
+        if (Build.VERSION.SDK_INT < 29) throw new IOException("needs Android 10 or later");
         Context ctx = c.ctx;
         Bitmap bmp = Bitmap.createBitmap(1600, 1000, Bitmap.Config.ARGB_8888);
         Canvas cv = new Canvas(bmp);
@@ -456,14 +481,14 @@ final class Exporter {
         p.setTextAlign(Paint.Align.CENTER);
         cv.drawText("Immich Server", 800, 470, p);
         p.setTextSize(56);
-        String stamp = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.ITALY).format(new Date());
-        cv.drawText("immagine di prova — " + stamp, 800, 570, p);
+        String stamp = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(new Date());
+        cv.drawText("test image — " + stamp, 800, 570, p);
         ByteArrayOutputStream bo = new ByteArrayOutputStream();
         bmp.compress(Bitmap.CompressFormat.JPEG, 90, bo);
-        File tmp = File.createTempFile("prova", ".jpg", ctx.getCacheDir());
+        File tmp = File.createTempFile("test", ".jpg", ctx.getCacheDir());
         try {
             Util.copy(new java.io.ByteArrayInputStream(bo.toByteArray()), tmp);
-            String name = "Immich-prova-" + new SimpleDateFormat("HHmmss", Locale.US).format(new Date()) + ".jpg";
+            String name = "Immich-test-" + new SimpleDateFormat("HHmmss", Locale.US).format(new Date()) + ".jpg";
             Uri u = insert(ctx, tmp, name, "image/jpeg", takenMs);
             addStaged(c, u, tmp.length(), stagedTs); // anche la prova è una copia temporanea: sparisce da sola
             return name;

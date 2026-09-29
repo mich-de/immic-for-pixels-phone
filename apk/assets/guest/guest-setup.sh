@@ -22,15 +22,15 @@ PG_MAJOR="${PG_MAJOR:-17}"
 export DEBIAN_FRONTEND=noninteractive LANG=C.UTF-8 LC_ALL=C.UTF-8
 
 say() { printf '\n[guest] %s\n' "$*"; }
-fail() { printf '\n[guest] ERRORE: %s\n' "$*" >&2; exit 1; }
+fail() { printf '\n[guest] ERROR: %s\n' "$*" >&2; exit 1; }
 
 check() {
-  say "verifiche"
+  say "checks"
   local ok=1
 
   "$APP/node/bin/node" --version >/dev/null 2>&1 \
     && echo "  node       $("$APP/node/bin/node" --version)" \
-    || { echo "  node       NON parte"; ok=0; }
+    || { echo "  node       DOES NOT START"; ok=0; }
 
   # moduli nativi caricati da Node (sharp = libvips, bcrypt): se falliscono qui
   # il server non parte, meglio scoprirlo ora.
@@ -39,7 +39,7 @@ check() {
       console.log('  sharp      libvips ' + s.versions.vips + ' · bcrypt ok');
       const f = Object.keys(s.format).filter(k => s.format[k].input && s.format[k].input.buffer);
       console.log('  formati    ' + f.join(' '));
-    "); then :; else echo "  moduli nativi (sharp/bcrypt): ERRORE"; ok=0; fi
+    "); then :; else echo "  native modules (sharp/bcrypt): ERROR"; ok=0; fi
 
   # Immich converte i video HDR (10 bit, BT.2020) con il filtro tonemapx: senza, niente miniature né transcodifica
   if command -v ffmpeg >/dev/null; then
@@ -48,35 +48,35 @@ check() {
     filters="$(ffmpeg -hide_banner -filters 2>/dev/null || true)"
     case "$filters" in
       *tonemapx*) echo "  ffmpeg     $ffv (tonemapx ok)" ;;
-      *) echo "  ffmpeg     $ffv SENZA tonemapx: i video HDR resterebbero senza miniature"; ok=0 ;;
+      *) echo "  ffmpeg     $ffv WITHOUT tonemapx: HDR videos would get no thumbnails"; ok=0 ;;
     esac
-  else echo "  ffmpeg     MANCA"; ok=0; fi
-  if command -v ffprobe >/dev/null; then echo "  ffprobe    $(ffprobe -version | head -1 | cut -d' ' -f3)"; else echo "  ffprobe    MANCA"; ok=0; fi
-  if command -v perl >/dev/null;   then echo "  perl       $(perl -e 'print $^V')"; else echo "  perl       MANCA"; ok=0; fi
+  else echo "  ffmpeg     MISSING"; ok=0; fi
+  if command -v ffprobe >/dev/null; then echo "  ffprobe    $(ffprobe -version | head -1 | cut -d' ' -f3)"; else echo "  ffprobe    MISSING"; ok=0; fi
+  if command -v perl >/dev/null;   then echo "  perl       $(perl -e 'print $^V')"; else echo "  perl       MISSING"; ok=0; fi
   # solo informativo (Amministrazione → Informazioni server): se manca, quel campo resta vuoto, il server funziona lo stesso
-  if command -v magick >/dev/null; then echo "  magick     $(magick --version | head -1)"; else echo "  magick     manca (solo il campo ImageMagick in \"Informazioni server\" resta vuoto)"; fi
+  if command -v magick >/dev/null; then echo "  magick     $(magick --version | head -1)"; else echo "  magick     missing (only the ImageMagick field in the server info stays empty)"; fi
 
   local pgbin="/usr/lib/postgresql/$PG_MAJOR/bin"
-  if [ -x "$pgbin/postgres" ]; then echo "  postgres   $("$pgbin/postgres" --version | cut -d' ' -f3)"; else echo "  postgres   MANCA"; ok=0; fi
-  ls "/usr/lib/postgresql/$PG_MAJOR/lib/vchord.so" >/dev/null 2>&1 && echo "  vchord     ok" || { echo "  vchord     MANCA"; ok=0; }
-  ls "/usr/share/postgresql/$PG_MAJOR/extension/vector.control" >/dev/null 2>&1 && echo "  pgvector   ok" || { echo "  pgvector   MANCA"; ok=0; }
-  if command -v valkey-server >/dev/null; then echo "  valkey     $(valkey-server --version | sed -n 's/.*v=\([^ ]*\).*/\1/p')"; else echo "  valkey     MANCA"; ok=0; fi
+  if [ -x "$pgbin/postgres" ]; then echo "  postgres   $("$pgbin/postgres" --version | cut -d' ' -f3)"; else echo "  postgres   MISSING"; ok=0; fi
+  ls "/usr/lib/postgresql/$PG_MAJOR/lib/vchord.so" >/dev/null 2>&1 && echo "  vchord     ok" || { echo "  vchord     MISSING"; ok=0; }
+  ls "/usr/share/postgresql/$PG_MAJOR/extension/vector.control" >/dev/null 2>&1 && echo "  pgvector   ok" || { echo "  pgvector   MISSING"; ok=0; }
+  if command -v valkey-server >/dev/null; then echo "  valkey     $(valkey-server --version | sed -n 's/.*v=\([^ ]*\).*/\1/p')"; else echo "  valkey     MISSING"; ok=0; fi
 
-  for u in postgres valkey immich; do id "$u" >/dev/null 2>&1 || { echo "  utente $u  MANCA"; ok=0; }; done
+  for u in postgres valkey immich; do id "$u" >/dev/null 2>&1 || { echo "  user $u  MISSING"; ok=0; }; done
 
-  [ "$ok" = 1 ] || fail "alcune verifiche sono fallite (vedi sopra)"
-  say "tutto ok"
+  [ "$ok" = 1 ] || fail "some checks failed (see above)"
+  say "all ok"
 }
 
 setup() {
-  [ -x "$APP/node/bin/node" ] || fail "manca $APP/node/bin/node: il pacchetto dell'app non è montato in $APP"
+  [ -x "$APP/node/bin/node" ] || fail "missing $APP/node/bin/node: the app package is not mounted at $APP"
   ARCH="$(dpkg --print-architecture)"
   VCHORD_DEB="$(ls "$APP"/deb/postgresql-"$PG_MAJOR"-vchord_*_"$ARCH".deb 2>/dev/null | head -1 || true)"
-  [ -n "$VCHORD_DEB" ] || fail "manca il .deb di VectorChord per Postgres $PG_MAJOR ($ARCH) in $APP/deb"
+  [ -n "$VCHORD_DEB" ] || fail "missing the VectorChord .deb for Postgres $PG_MAJOR ($ARCH) in $APP/deb"
   FFMPEG_DEB="$(ls "$APP"/deb/jellyfin-ffmpeg*_"$ARCH".deb 2>/dev/null | head -1 || true)"
-  [ -n "$FFMPEG_DEB" ] || fail "manca il .deb di jellyfin-ffmpeg ($ARCH) in $APP/deb: ricostruisci il pacchetto con pc/build-app.sh"
+  [ -n "$FFMPEG_DEB" ] || fail "missing the jellyfin-ffmpeg .deb ($ARCH) in $APP/deb: rebuild the package with pc/build-app.sh"
 
-  say "configurazione apt/dpkg per l'ambiente proot"
+  say "apt/dpkg configuration for the proot environment"
   # Niente init system: impedisce ai pacchetti di provare ad avviare i servizi.
   printf '#!/bin/sh\nexit 101\n' > /usr/sbin/policy-rc.d
   chmod +x /usr/sbin/policy-rc.d
@@ -98,33 +98,33 @@ EOF
   apt-get update
   apt-get -y upgrade
 
-  say "pacchetti: postgresql-$PG_MAJOR, pgvector, valkey, perl, locales..."
+  say "packages: postgresql-$PG_MAJOR, pgvector, valkey, perl, locales..."
   apt-get -y install \
     ca-certificates curl locales tzdata perl xz-utils procps \
     "postgresql-$PG_MAJOR" "postgresql-$PG_MAJOR-pgvector" \
     valkey-server valkey-tools \
     imagemagick
 
-  say "VectorChord (deb ufficiale $ARCH)"
+  say "VectorChord (official $ARCH deb)"
   apt-get -y install "$VCHORD_DEB"
 
   # Lo stesso ffmpeg dell'immagine ufficiale di Immich: quello di Debian non ha tonemapx, e i video HDR
   # restano senza miniature ("Errore nel caricamento dell'immagine"). In /usr/local/bin vince nel PATH.
-  say "ffmpeg di Jellyfin ($(basename "$FFMPEG_DEB"))"
+  say "Jellyfin ffmpeg ($(basename "$FFMPEG_DEB"))"
   apt-get -y install "$FFMPEG_DEB"
   ln -sf /usr/lib/jellyfin-ffmpeg/ffmpeg /usr/local/bin/ffmpeg
   ln -sf /usr/lib/jellyfin-ffmpeg/ffprobe /usr/local/bin/ffprobe
   # le installazioni precedenti avevano l'ffmpeg di Debian: toglierlo libera qualche centinaio di MB
   if dpkg -s ffmpeg >/dev/null 2>&1; then
-    say "tolgo l'ffmpeg di Debian"
+    say "removing Debian's ffmpeg"
     apt-get -y purge --autoremove ffmpeg
   fi
 
-  say "locale en_US.UTF-8 (come l'immagine Postgres di Immich)"
+  say "locale en_US.UTF-8 (like Immich's Postgres image)"
   sed -i 's/^# *\(en_US.UTF-8 UTF-8\)/\1/' /etc/locale.gen
   locale-gen >/dev/null
 
-  say "utente di servizio 'immich'"
+  say "service user 'immich'"
   if ! id immich >/dev/null 2>&1; then
     useradd --system --create-home --home-dir /var/lib/immich --shell /bin/bash immich
   fi
@@ -141,5 +141,5 @@ EOF
 case "${1:-setup}" in
   setup) setup ;;
   check) check ;;
-  *) fail "uso: $0 [setup|check]" ;;
+  *) fail "usage: $0 [setup|check]" ;;
 esac

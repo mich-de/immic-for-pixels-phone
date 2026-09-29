@@ -56,7 +56,7 @@ final class Util {
 
     static void mkdirs(File... dirs) throws IOException {
         for (File d : dirs) {
-            if (!d.isDirectory() && !d.mkdirs() && !d.isDirectory()) throw new IOException("impossibile creare " + d);
+            if (!d.isDirectory() && !d.mkdirs() && !d.isDirectory()) throw new IOException("cannot create " + d);
         }
     }
 
@@ -135,7 +135,7 @@ final class Util {
             }
             return s;
         } catch (IOException e) {
-            return "(log non leggibile: " + e.getMessage() + ")";
+            return "(log not readable: " + e.getMessage() + ")";
         }
     }
 

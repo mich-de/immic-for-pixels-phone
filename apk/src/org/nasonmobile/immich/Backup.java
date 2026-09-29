@@ -34,7 +34,7 @@ final class Backup {
     }
 
     static String status() {
-        return status.isEmpty() ? "Non ancora avviato." : status;
+        return status.isEmpty() ? "Not started yet." : status;
     }
 
     static boolean running() {
@@ -64,29 +64,29 @@ final class Backup {
                 ? new File[][]{{c.dcimUpload(), dst}, {c.dcimLibrary(), new File(dst, "library")}}
                 : new File[][]{{new File(c.library, "upload"), dst}};
             if (!pairs[0][0].isDirectory() && !pairs[pairs.length - 1][0].isDirectory()) {
-                status = "Niente da copiare: la libreria di Immich è vuota.";
+                status = "Nothing to copy: the Immich library is empty.";
                 return;
             }
             Util.mkdirs(dst);
-            status = "Preparazione…";
+            status = "Preparing…";
             for (File[] p : pairs) {
                 if (p[0].isDirectory() && !stopRequested && !n.lowSpace) walk(p[0], p[1], n);
             }
             long secs = Math.max(1, (System.currentTimeMillis() - t0) / 1000);
             if (stopRequested) {
-                status = "Interrotto: " + n.copied + " file copiati (" + mb(n.bytes) + "), " + n.skipped + " già presenti. "
-                    + "Premi di nuovo per continuare da dove si era fermato.";
+                status = "Stopped: " + n.copied + " files copied (" + mb(n.bytes) + "), " + n.skipped + " already there. "
+                    + "Press again to continue from where it stopped.";
             } else if (n.lowSpace) {
-                status = "In pausa: spazio quasi esaurito sul telefono. " + n.copied + " file copiati (" + mb(n.bytes) + "). "
-                    + "Libera spazio e premi di nuovo per continuare.";
+                status = "Paused: the phone is almost out of space. " + n.copied + " files copied (" + mb(n.bytes) + "). "
+                    + "Free some space and press again to continue.";
             } else {
-                status = "Fatto in " + secs + " s: " + n.copied + " file copiati (" + mb(n.bytes) + "), " + n.skipped
-                    + " già presenti" + (n.failed > 0 ? ", " + n.failed + " non riusciti (vedi il log)" : "") + ". In "
+                status = "Done in " + secs + " s: " + n.copied + " files copied (" + mb(n.bytes) + "), " + n.skipped
+                    + " already there" + (n.failed > 0 ? ", " + n.failed + " failed (see the log)" : "") + ". In "
                     + destDir().getPath() + ".";
             }
         } catch (Exception e) {
-            Log.w(Cfg.TAG, "backup sul telefono: " + e);
-            status = "Errore: " + e.getMessage() + " (" + n.copied + " file copiati prima dell'errore)";
+            Log.w(Cfg.TAG, "phone backup: " + e);
+            status = "Error: " + e.getMessage() + " (" + n.copied + " files copied before the error)";
         } finally {
             running = false;
         }
@@ -116,13 +116,13 @@ final class Backup {
                     n.skipped++;
                     continue;
                 }
-                status = "Copio: " + (n.copied + n.skipped + 1) + "° file — " + k.getName();
+                status = "Copying file " + (n.copied + n.skipped + 1) + " — " + k.getName();
                 try {
                     copyFile(k, out);
                     n.copied++;
                     n.bytes += k.length();
                 } catch (IOException e) {
-                    Log.w(Cfg.TAG, "backup, file non copiato (" + k + "): " + e);
+                    Log.w(Cfg.TAG, "backup, file not copied (" + k + "): " + e);
                     n.failed++;
                 }
             }
@@ -138,12 +138,12 @@ final class Backup {
         }
         if (!tmp.renameTo(dst)) {
             tmp.delete();
-            throw new IOException("impossibile spostare " + tmp + " su " + dst);
+            throw new IOException("cannot move " + tmp + " to " + dst);
         }
     }
 
     private static String mb(long bytes) {
-        return bytes >= (1L << 30) ? String.format(java.util.Locale.ITALY, "%.1f GB", bytes / (double) (1L << 30))
+        return bytes >= (1L << 30) ? String.format(java.util.Locale.US, "%.1f GB", bytes / (double) (1L << 30))
             : (bytes >> 20) + " MB";
     }
 }

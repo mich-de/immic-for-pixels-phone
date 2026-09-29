@@ -109,7 +109,7 @@ public class MainActivity extends Activity {
             boolean on = in.getBooleanExtra("dcim_originals", false);
             DcimMode.onSwitch(cfg, on);
             if (dcimBox != null) dcimBox.setChecked(on);
-            android.util.Log.i(Cfg.TAG, "originali in DCIM da adb: " + on);
+            android.util.Log.i(Cfg.TAG, "originals in DCIM from adb: " + on);
         }
         if (in.hasExtra("missing_cleanup")) {
             cfg.prefs.edit().putBoolean("missing_cleanup", in.getBooleanExtra("missing_cleanup", false)).apply();
@@ -133,7 +133,7 @@ public class MainActivity extends Activity {
                 @Override
                 public void run() {
                     final String r = Pruner.testApiKey(cfg, key);
-                    android.util.Log.i(Cfg.TAG, "chiave API salvata da adb; prova: " + r);
+                    android.util.Log.i(Cfg.TAG, "API key saved from adb; test: " + r);
                 }
             }).start();
         }
@@ -143,7 +143,7 @@ public class MainActivity extends Activity {
                 @Override
                 public void run() {
                     int n = Exporter.cleanup(cfg, all);
-                    android.util.Log.i(Cfg.TAG, "pulizia copie in galleria (" + (all ? "tutte" : "scadute") + "): eliminate " + n);
+                    android.util.Log.i(Cfg.TAG, "gallery copies cleanup (" + (all ? "all" : "expired") + "): deleted " + n);
                 }
             }).start();
         }
@@ -158,9 +158,9 @@ public class MainActivity extends Activity {
                     try {
                         msg = Exporter.dryRun(Stack.I, cfg);
                     } catch (Exception e) {
-                        msg = "errore: " + e;
+                        msg = "error: " + e;
                     }
-                    android.util.Log.i(Cfg.TAG, "prova a secco: " + msg);
+                    android.util.Log.i(Cfg.TAG, "dry run: " + msg);
                 }
             }).start();
         }
@@ -174,9 +174,9 @@ public class MainActivity extends Activity {
                         msg = "ok: " + Exporter.testImage(cfg, in.getLongExtra("export_test_ms", now),
                             in.getLongExtra("export_test_staged_ms", now));
                     } catch (Exception e) {
-                        msg = "errore: " + e;
+                        msg = "error: " + e;
                     }
-                    android.util.Log.i(Cfg.TAG, "immagine di prova " + msg);
+                    android.util.Log.i(Cfg.TAG, "test image " + msg);
                     try {
                         Util.write(new File(cfg.logs, "export-test.txt"), msg + "\n");
                     } catch (java.io.IOException ignored) {
@@ -206,14 +206,14 @@ public class MainActivity extends Activity {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 startBackup();
             } else {
-                Toast.makeText(this, "Serve il permesso \"Memoria\" per copiare sul telefono", Toast.LENGTH_LONG).show();
+                Toast.makeText(this, "The Storage permission is needed to copy to the phone", Toast.LENGTH_LONG).show();
             }
         } else if (requestCode == REQ_STORAGE_DCIM) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 applyDcim(true);
             } else {
                 dcimBox.setChecked(false);
-                Toast.makeText(this, "Serve il permesso \"Memoria\" per salvare gli originali in DCIM", Toast.LENGTH_LONG).show();
+                Toast.makeText(this, "The Storage permission is needed to keep the originals in DCIM", Toast.LENGTH_LONG).show();
             }
         }
     }
@@ -233,9 +233,9 @@ public class MainActivity extends Activity {
         DcimMode.onSwitch(cfg, on);
         Stack.State s = Stack.I.state();
         if (s == Stack.State.IDLE || s == Stack.State.ERROR) {
-            Toast.makeText(this, "Si applica al prossimo avvio del server", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, "It applies at the next server start", Toast.LENGTH_LONG).show();
         } else {
-            Toast.makeText(this, on ? "Riavvio il server e sposto gli originali in DCIM (qualche minuto)" : "Riavvio il server",
+            Toast.makeText(this, on ? "Restarting the server and moving the originals to DCIM (a few minutes)" : "Restarting the server",
                 Toast.LENGTH_LONG).show();
             restartServer();
         }
@@ -280,7 +280,7 @@ public class MainActivity extends Activity {
             return;
         }
         if (Stack.I.state() != Stack.State.RUNNING) {
-            Toast.makeText(this, "Avvia prima il server", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Start the server first", Toast.LENGTH_SHORT).show();
             return;
         }
         if (checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
@@ -343,12 +343,12 @@ public class MainActivity extends Activity {
 
     private void confirmPurge() {
         new AlertDialog.Builder(this)
-            .setTitle("Elimina le copie in galleria")
-            .setMessage("Elimina da DCIM/Immich le copie temporanee. Le foto restano in Immich. Se Google Foto non le ha ancora "
-                + "caricate, non le caricherà. \"Elimina e ricopia da capo\" le elimina e alla prossima copia ricomincia da tutte "
-                + "le foto.")
-            .setNegativeButton("Annulla", null)
-            .setNeutralButton("Elimina e ricopia da capo", new DialogInterface.OnClickListener() {
+            .setTitle("Delete the gallery copies")
+            .setMessage("Deletes the temporary copies from DCIM/Immich. The photos stay in Immich. If Google Photos hasn't "
+                + "uploaded them yet, it won't. \"Delete and copy again\" deletes them and the next copy starts over from all "
+                + "the photos.")
+            .setNegativeButton("Cancel", null)
+            .setNeutralButton("Delete and copy again", new DialogInterface.OnClickListener() {
                 @Override
                 public void onClick(DialogInterface d, int w) {
                     new Thread(new Runnable() {
@@ -359,14 +359,14 @@ public class MainActivity extends Activity {
                             handler.post(new Runnable() {
                                 @Override
                                 public void run() {
-                                    Toast.makeText(MainActivity.this, "Fatto: premi \"Copia ora\" per ricominciare", Toast.LENGTH_LONG).show();
+                                    Toast.makeText(MainActivity.this, "Done: press \"Copy now\" to start over", Toast.LENGTH_LONG).show();
                                 }
                             });
                         }
                     }).start();
                 }
             })
-            .setPositiveButton("Elimina", new DialogInterface.OnClickListener() {
+            .setPositiveButton("Delete", new DialogInterface.OnClickListener() {
                 @Override
                 public void onClick(DialogInterface d, int w) {
                     new Thread(new Runnable() {
@@ -376,7 +376,7 @@ public class MainActivity extends Activity {
                             handler.post(new Runnable() {
                                 @Override
                                 public void run() {
-                                    Toast.makeText(MainActivity.this, "Eliminate " + n + " copie", Toast.LENGTH_SHORT).show();
+                                    Toast.makeText(MainActivity.this, "Deleted " + n + " copies", Toast.LENGTH_SHORT).show();
                                 }
                             });
                         }
@@ -395,7 +395,7 @@ public class MainActivity extends Activity {
         sv.addView(root);
 
         root.addView(text("Immich Server", 24, C_TEXT, true));
-        root.addView(text("Il tuo server di foto e video, su questo telefono", 14, C_MUTED, false), lp(2));
+        root.addView(text("Your photo and video server, on this phone", 14, C_MUTED, false), lp(2));
 
         status = text("", 20, C_TEXT, true);
         root.addView(status, lp(20));
@@ -411,13 +411,13 @@ public class MainActivity extends Activity {
 
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
-        mainBtn = button("Installa e avvia", new View.OnClickListener() {
+        mainBtn = button("Install and start", new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 toggle();
             }
         });
-        openBtn = button("Apri Immich", new View.OnClickListener() {
+        openBtn = button("Open Immich", new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("http://127.0.0.1:" + cfg.port())));
@@ -427,25 +427,25 @@ public class MainActivity extends Activity {
         row.addView(openBtn, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
         root.addView(row, lp(10));
 
-        root.addView(text("Perché il server resti attivo", 16, C_TEXT, true), lp(26));
+        root.addView(text("Keeping the server alive", 16, C_TEXT, true), lp(26));
         health = text("", 13, C_MUTED, false);
         root.addView(health, lp(4));
         storage = text("", 13, C_MUTED, false);
         root.addView(storage, lp(2));
-        root.addView(button("Escludi dal risparmio batteria", new View.OnClickListener() {
+        root.addView(button("Exclude from battery optimization", new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 batterySettings();
             }
         }), lp(6));
-        root.addView(button("Restrizioni sui processi figli (Android 12+)", new View.OnClickListener() {
+        root.addView(button("Child process restrictions (Android 12+)", new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 phantomDialog();
             }
         }), lp(0));
         CheckBox auto = new CheckBox(this);
-        auto.setText("Avvia il server all'accensione del telefono");
+        auto.setText("Start the server when the phone boots");
         auto.setChecked(cfg.autostart());
         auto.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
@@ -455,16 +455,16 @@ public class MainActivity extends Activity {
         });
         root.addView(auto, lp(6));
 
-        root.addView(text("Galleria e Google Foto", 16, C_TEXT, true), lp(26));
-        root.addView(text("Le foto caricate su Immich stanno nella memoria privata dell'app: Galleria, File e Google Foto non le "
-            + "vedono, e Google Foto può caricare solo file della memoria condivisa. Per questo l'app ne fa una copia TEMPORANEA "
-            + "in DCIM/Immich e poi la elimina da sola: l'originale resta in Immich e, dopo il backup, anche nel cloud di Google. "
-            + "Una volta sola, in Google Foto: Impostazioni → Backup → Cartelle del dispositivo → attiva \"Immich\". Per liberare "
-            + "prima puoi usare \"Libera spazio\" di Google Foto. Sul Pixel 5 lo spazio illimitato è in qualità \"Risparmio spazio\" "
-            + "(foto a 16 MP, video a 1080p). Nell'app Immich non attivare il backup della cartella \"Immich\": le rimanderebbe "
-            + "al server.", 12, C_MUTED, false), lp(4));
+        root.addView(text("Gallery and Google Photos", 16, C_TEXT, true), lp(26));
+        root.addView(text("Photos uploaded to Immich live in the app's private storage: Gallery, Files and Google Photos can't see "
+            + "them, and Google Photos can only upload files from shared storage. So the app makes a TEMPORARY copy in "
+            + "DCIM/Immich and deletes it by itself later: the original stays in Immich and, after the backup, in Google's "
+            + "cloud too. Once, in Google Photos: Settings → Backup → Back up device folders → turn on \"Immich\". To free "
+            + "the space earlier use Google Photos' \"Free up space\". On Pixel 2–5 the unlimited storage is in \"Storage "
+            + "saver\" quality (photos at 16 MP, videos at 1080p). Don't back up the \"Immich\" folder with the Immich app: "
+            + "it would send the photos back to the server.", 12, C_MUTED, false), lp(4));
         CheckBox exp = new CheckBox(this);
-        exp.setText("Copia automaticamente le foto nuove nella galleria");
+        exp.setText("Copy new photos to the gallery automatically");
         exp.setChecked(cfg.prefs.getBoolean("export_enabled", false));
         exp.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
@@ -474,7 +474,7 @@ public class MainActivity extends Activity {
         });
         root.addView(exp, lp(6));
         CheckBox expAll = new CheckBox(this);
-        expAll.setText("Includi anche le foto degli altri utenti di Immich");
+        expAll.setText("Include the photos of the other Immich users too");
         expAll.setChecked(cfg.prefs.getBoolean("export_all_users", false));
         expAll.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
@@ -483,26 +483,26 @@ public class MainActivity extends Activity {
             }
         });
         root.addView(expAll, lp(0));
-        root.addView(text("Elimina la copia in galleria dopo", 13, C_TEXT, false), lp(10));
-        root.addView(prefSpinner("export_keep_days", new String[]{"Mai", "3 giorni", "5 giorni", "7 giorni", "30 giorni"},
+        root.addView(text("Delete the gallery copy after", 13, C_TEXT, false), lp(10));
+        root.addView(prefSpinner("export_keep_days", new String[]{"Never", "3 days", "5 days", "7 days", "30 days"},
             new int[]{0, 3, 5, 7, 30}, 7), lp(0));
-        root.addView(text("Copie in galleria in attesa di backup: al massimo", 13, C_TEXT, false), lp(8));
-        root.addView(prefSpinner("export_cap_gb", new String[]{"Nessun tetto", "5 GB", "10 GB", "20 GB", "50 GB"},
+        root.addView(text("Gallery copies waiting for backup: at most", 13, C_TEXT, false), lp(8));
+        root.addView(prefSpinner("export_cap_gb", new String[]{"No cap", "5 GB", "10 GB", "20 GB", "50 GB"},
             new int[]{0, 5, 10, 20, 50}, 10), lp(0));
         LinearLayout expRow = new LinearLayout(this);
         expRow.setOrientation(LinearLayout.HORIZONTAL);
-        expRow.addView(button("Copia ora", new View.OnClickListener() {
+        expRow.addView(button("Copy now", new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 if (Stack.I.state() != Stack.State.RUNNING) {
-                    Toast.makeText(MainActivity.this, "Avvia prima il server", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(MainActivity.this, "Start the server first", Toast.LENGTH_SHORT).show();
                 } else {
                     Stack.I.exportNow();
-                    Toast.makeText(MainActivity.this, "Copia avviata", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(MainActivity.this, "Copy started", Toast.LENGTH_SHORT).show();
                 }
             }
         }), new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-        expRow.addView(button("Immagine di prova", new View.OnClickListener() {
+        expRow.addView(button("Test image", new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 new Thread(new Runnable() {
@@ -510,9 +510,9 @@ public class MainActivity extends Activity {
                     public void run() {
                         String msg;
                         try {
-                            msg = "Creata in DCIM/Immich: " + Exporter.testImage(cfg);
+                            msg = "Created in DCIM/Immich: " + Exporter.testImage(cfg);
                         } catch (Exception e) {
-                            msg = "Non riuscito: " + e.getMessage();
+                            msg = "Failed: " + e.getMessage();
                         }
                         final String m = msg;
                         handler.post(new Runnable() {
@@ -526,7 +526,7 @@ public class MainActivity extends Activity {
             }
         }), new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
         root.addView(expRow, lp(6));
-        root.addView(button("Elimina ora le copie in galleria", new View.OnClickListener() {
+        root.addView(button("Delete the gallery copies now", new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 confirmPurge();
@@ -535,13 +535,13 @@ public class MainActivity extends Activity {
         exportStatus = text("", 12, C_MUTED, false);
         root.addView(exportStatus, lp(4));
 
-        root.addView(text("Backup sul telefono", 16, C_TEXT, true), lp(26));
-        root.addView(text("Copia gli originali di Immich (quelli veri, non le miniature) in \"" + Backup.DIR
-            + "\" nella memoria del telefono: una cartella normale, che vedi con qualunque app Gestione file o "
-            + "collegando il telefono al PC. In aggiunta alla copia temporanea in Galleria qui sopra (pensata per "
-            + "Google Foto) e a quella su PC descritta nel README. Manuale, incrementale: puoi fermarla e "
-            + "rilanciarla, riparte da dove si era fermata senza ricopiare tutto. Non elimina mai nulla.", 12, C_MUTED, false), lp(4));
-        backupBtn = button("Copia ora sul telefono", new View.OnClickListener() {
+        root.addView(text("Backup on the phone", 16, C_TEXT, true), lp(26));
+        root.addView(text("Copies Immich's originals (the real files, not the thumbnails) to \"" + Backup.DIR
+            + "\" in the phone's storage: a normal folder that any file manager shows, or a PC when the phone is "
+            + "connected. In addition to the temporary gallery copy above (meant for Google Photos) and to the PC "
+            + "copy described in the README. Manual and incremental: you can stop it and start it again, it resumes "
+            + "where it stopped without copying everything again. It never deletes anything.", 12, C_MUTED, false), lp(4));
+        backupBtn = button("Copy to the phone now", new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 toggleBackup();
@@ -551,13 +551,13 @@ public class MainActivity extends Activity {
         backupStatus = text("", 12, C_MUTED, false);
         root.addView(backupStatus, lp(4));
 
-        root.addView(text("Batteria", 16, C_TEXT, true), lp(26));
-        root.addView(text("Un telefono sempre in carica resta fermo al 100%, che con gli anni stressa la batteria più "
-            + "di un giro tra due soglie. Android non dà a un'app normale (senza root, e questa non lo è) il "
-            + "controllo della ricarica: nessuna app può accendere o spegnere il caricabatterie da sola. Quello che "
-            + "si può fare è avvisare, per scollegare e ricollegare a mano.", 12, C_MUTED, false), lp(4));
+        root.addView(text("Battery", 16, C_TEXT, true), lp(26));
+        root.addView(text("A phone that is always plugged in sits at 100%, which over the years wears the battery more than "
+            + "cycling between two thresholds. Android doesn't give a normal app (without root, and this one isn't) "
+            + "control over charging: no app can switch the charger on or off by itself. What it can do is remind "
+            + "you, so you unplug and plug back in by hand.", 12, C_MUTED, false), lp(4));
         CheckBox battGuard = new CheckBox(this);
-        battGuard.setText("Avvisami per non tenerlo sempre in carica al 100%");
+        battGuard.setText("Remind me not to keep it charging at 100%");
         battGuard.setChecked(cfg.prefs.getBoolean("battery_guard_enabled", false));
         battGuard.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
@@ -566,38 +566,38 @@ public class MainActivity extends Activity {
             }
         });
         root.addView(battGuard, lp(6));
-        root.addView(text("Avvisa di scollegare sopra", 13, C_TEXT, false), lp(8));
+        root.addView(text("Remind me to unplug above", 13, C_TEXT, false), lp(8));
         root.addView(prefSpinner("battery_guard_high", new String[]{"60%", "70%", "80%", "90%"},
             new int[]{60, 70, 80, 90}, 80), lp(0));
-        root.addView(text("Avvisa di ricollegare sotto", 13, C_TEXT, false), lp(8));
+        root.addView(text("Remind me to plug back in below", 13, C_TEXT, false), lp(8));
         root.addView(prefSpinner("battery_guard_low", new String[]{"20%", "30%", "40%", "50%"},
             new int[]{20, 30, 40, 50}, 30), lp(0));
         batteryStatus = text("", 12, C_MUTED, false);
         root.addView(batteryStatus, lp(6));
 
-        root.addView(text("Elimina l'originale anche da Immich", 14, C_TEXT, true), lp(20));
-        root.addView(text("Facoltativo: dopo che una foto è stata copiata nella galleria, elimina l'originale ANCHE da "
-            + "Immich, in modo definitivo (non nel cestino). Da quel momento sul telefono non resta nessuna copia "
-            + "dell'originale: solo quella, compressa, che Google Foto ha caricato (qualità \"Risparmio spazio\", non "
-            + "l'originale). Usalo solo se hai già verificato che il backup di Google Foto funziona.", 12, C_MUTED, false), lp(4));
-        root.addView(text("Chiave API di Immich (Account → Chiavi API → Nuova chiave, permesso \"Elimina risorse\")",
+        root.addView(text("Also delete the original from Immich", 14, C_TEXT, true), lp(20));
+        root.addView(text("Optional: some days after a photo reaches the gallery, deletes the original from Immich TOO, "
+            + "permanently (not to the trash). From then on no copy of the original is left on the phone: only the "
+            + "one Google Photos uploaded (in \"Storage saver\" quality on Pixel 2–5, not the original). Use it only "
+            + "once you have checked that the Google Photos backup works.", 12, C_MUTED, false), lp(4));
+        root.addView(text("Immich API key (Account Settings → API Keys → New API Key, permission \"all\" or asset.delete)",
             13, C_TEXT, false), lp(10));
         apiKeyField = new EditText(this);
-        apiKeyField.setHint("incolla qui la chiave");
+        apiKeyField.setHint("paste the key here");
         apiKeyField.setSingleLine(true);
         apiKeyField.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
         apiKeyField.setText(cfg.prefs.getString("prune_api_key", ""));
         root.addView(apiKeyField, lp(4));
         LinearLayout keyRow = new LinearLayout(this);
         keyRow.setOrientation(LinearLayout.HORIZONTAL);
-        keyRow.addView(button("Salva la chiave", new View.OnClickListener() {
+        keyRow.addView(button("Save the key", new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 cfg.prefs.edit().putString("prune_api_key", apiKeyField.getText().toString().trim()).apply();
-                Toast.makeText(MainActivity.this, "Salvata", Toast.LENGTH_SHORT).show();
+                Toast.makeText(MainActivity.this, "Saved", Toast.LENGTH_SHORT).show();
             }
         }), new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-        keyRow.addView(button("Prova la chiave", new View.OnClickListener() {
+        keyRow.addView(button("Test the key", new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 final String k = apiKeyField.getText().toString().trim();
@@ -616,22 +616,22 @@ public class MainActivity extends Activity {
             }
         }), new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
         root.addView(keyRow, lp(4));
-        root.addView(text("Elimina l'originale da Immich dopo", 13, C_TEXT, false), lp(10));
-        root.addView(prefSpinner("prune_days", new String[]{"Mai (predefinito)", "2 giorni", "3 giorni", "5 giorni", "7 giorni"},
+        root.addView(text("Delete the original from Immich after", 13, C_TEXT, false), lp(10));
+        root.addView(prefSpinner("prune_days", new String[]{"Never (default)", "2 days", "3 days", "5 days", "7 days"},
             new int[]{0, 2, 3, 5, 7}, 0), lp(0));
         pruneStatus = text("", 12, C_MUTED, false);
         root.addView(pruneStatus, lp(6));
 
-        root.addView(text("Originali direttamente in DCIM/Immich", 14, C_TEXT, true), lp(20));
-        root.addView(text("Invece che nella cartella privata dell'app, Immich salva gli originali in DCIM/Immich/<utente> "
-            + "(per l'amministratore \"admin\") con il loro nome vero: Galleria e Google Foto li vedono subito, senza "
-            + "copie temporanee. In Google Foto attiva una volta il backup della cartella \"admin\" (Impostazioni → "
-            + "Backup → Cartelle del dispositivo). Attenzione: da lì anche le altre app possono cancellarli, per esempio "
-            + "\"Libera spazio\" di Google Foto dopo il backup; Immich resta allora con la foto senza l'originale (vedi la "
-            + "pulizia qui sotto). Miniature, video convertiti e database restano privati. Accendendolo il server si "
-            + "riavvia e sposta le foto già caricate (qualche minuto); serve il permesso Memoria.", 12, C_MUTED, false), lp(4));
+        root.addView(text("Originals directly in DCIM/Immich", 14, C_TEXT, true), lp(20));
+        root.addView(text("Instead of the app's private folder, Immich keeps the originals in DCIM/Immich/<user> (\"admin\" for "
+            + "the administrator) with their real names: Gallery and Google Photos see them right away, with no "
+            + "temporary copies. In Google Photos turn on the backup of the \"admin\" folder once (Settings → Backup → "
+            + "Back up device folders). Careful: other apps can delete them from there too, for example Google "
+            + "Photos' \"Free up space\" after its backup; Immich then keeps the photo without its original (see the "
+            + "cleanup below). Thumbnails, transcoded videos and the database stay private. Turning it on restarts the "
+            + "server and moves the photos already uploaded (a few minutes); it needs the Storage permission.", 12, C_MUTED, false), lp(4));
         dcimBox = new CheckBox(this);
-        dcimBox.setText("Salva gli originali in DCIM/Immich");
+        dcimBox.setText("Keep the originals in DCIM/Immich");
         dcimBox.setChecked(cfg.dcimWanted());
         dcimBox.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
@@ -644,7 +644,7 @@ public class MainActivity extends Activity {
         root.addView(dcimStatus, lp(4));
 
         CheckBox missing = new CheckBox(this);
-        missing.setText("Ogni notte sposta nel cestino di Immich le foto il cui file non c'è più");
+        missing.setText("Every night move to Immich's trash the photos whose file is gone");
         missing.setChecked(cfg.prefs.getBoolean("missing_cleanup", false));
         missing.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
@@ -653,10 +653,10 @@ public class MainActivity extends Activity {
             }
         });
         root.addView(missing, lp(8));
-        root.addView(text("Usa il controllo notturno di Immich (alle 3: Amministrazione → Manutenzione → Report di integrità → "
-            + "File mancanti) e la chiave API qui sopra; dal cestino di Immich si recuperano per 30 giorni. Non tocca nulla "
-            + "se ne mancano troppi insieme o se le cartelle non sono leggibili.", 12, C_MUTED, false), lp(2));
-        root.addView(button("Controlla ora", new View.OnClickListener() {
+        root.addView(text("Uses Immich's nightly check (at 3:00: Administration → Maintenance → Integrity Report → Missing Files) "
+            + "and the API key above; they can be restored from Immich's trash for 30 days. It does nothing if too many "
+            + "are missing at once or if the folders are not readable.", 12, C_MUTED, false), lp(2));
+        root.addView(button("Check now", new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 new Thread(new Runnable() {
@@ -676,9 +676,9 @@ public class MainActivity extends Activity {
         missingStatus = text("", 12, C_MUTED, false);
         root.addView(missingStatus, lp(4));
 
-        root.addView(text("Avanzate", 16, C_TEXT, true), lp(24));
+        root.addView(text("Advanced", 16, C_TEXT, true), lp(24));
         CheckBox noSec = new CheckBox(this);
-        noSec.setText("proot senza seccomp (solo se il server si blocca all'avvio)");
+        noSec.setText("proot without seccomp (only if the server hangs on start)");
         noSec.setChecked(cfg.noSeccomp());
         noSec.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
@@ -687,20 +687,20 @@ public class MainActivity extends Activity {
             }
         });
         root.addView(noSec, lp(4));
-        root.addView(button("Ripara: reinstalla il sistema Debian (dati e foto restano)", new View.OnClickListener() {
+        root.addView(button("Repair: reinstall the Debian system (data and photos stay)", new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 confirmRepair();
             }
         }), lp(4));
 
-        root.addView(text("Log e diagnostica", 16, C_TEXT, true), lp(24));
+        root.addView(text("Logs and diagnostics", 16, C_TEXT, true), lp(24));
         LinearLayout row2 = new LinearLayout(this);
         row2.setOrientation(LinearLayout.HORIZONTAL);
         row2.setGravity(Gravity.CENTER_VERTICAL);
         source = new Spinner(this);
         source.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item,
-            new String[]{"Installazione", "PostgreSQL", "Valkey", "Immich", "Diagnostica"}));
+            new String[]{"Setup", "PostgreSQL", "Valkey", "Immich", "Diagnostics"}));
         source.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> p, View v, int pos, long id) {
@@ -713,7 +713,7 @@ public class MainActivity extends Activity {
             }
         });
         row2.addView(source, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-        row2.addView(button("Esegui diagnosi", new View.OnClickListener() {
+        row2.addView(button("Run diagnostics", new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 runDiagnosis();
@@ -728,9 +728,9 @@ public class MainActivity extends Activity {
         logView.setTextIsSelectable(true);
         root.addView(logView, lp(8));
 
-        root.addView(text("Prossimi passi: quando lo stato è \"In esecuzione\", apri l'indirizzo qui sopra da un browser "
-            + "o dall'app Immich, crea l'utente amministratore e, in Amministrazione → Impostazioni → Machine Learning, "
-            + "disattiva il machine learning (su questo telefono è troppo pesante).", 12, C_MUTED, false), lp(18));
+        root.addView(text("Next steps: when the status reads \"Running\", open the address above in a browser or in the Immich "
+            + "app and create the admin user. Machine learning is turned off automatically: it is too heavy for this "
+            + "phone.", 12, C_MUTED, false), lp(18));
         return sv;
     }
 
@@ -743,54 +743,54 @@ public class MainActivity extends Activity {
         int color;
         switch (s) {
             case INSTALLING:
-                label = "Installazione in corso";
+                label = "Installing";
                 color = C_WARN;
                 break;
             case STARTING:
-                label = "Avvio in corso";
+                label = "Starting";
                 color = C_WARN;
                 break;
             case RUNNING:
-                label = "In esecuzione";
+                label = "Running";
                 color = C_OK;
                 break;
             case STOPPING:
-                label = "Arresto in corso";
+                label = "Stopping";
                 color = C_WARN;
                 break;
             case ERROR:
-                label = "Errore";
+                label = "Error";
                 color = C_ERR;
                 break;
             default:
-                label = installed ? "Fermo" : "Non installato";
+                label = installed ? "Stopped" : "Not installed";
                 color = C_MUTED;
                 break;
         }
         status.setText(label);
         status.setTextColor(color);
-        detail.setText(s == Stack.State.IDLE && !installed ? "Premi il pulsante per installare (serve internet)." : Stack.I.detail());
+        detail.setText(s == Stack.State.IDLE && !installed ? "Press the button to install (needs Internet)." : Stack.I.detail());
 
         int pct = Stack.I.progress();
         bar.setVisibility(pct >= 0 ? View.VISIBLE : View.GONE);
         bar.setProgress(Math.max(0, pct));
 
         boolean idle = s == Stack.State.IDLE || s == Stack.State.ERROR;
-        mainBtn.setText(idle ? (installed ? "Avvia il server" : "Installa e avvia") : "Ferma il server");
+        mainBtn.setText(idle ? (installed ? "Start the server" : "Install and start") : "Stop the server");
         mainBtn.setEnabled(s != Stack.State.STOPPING);
         openBtn.setEnabled(s == Stack.State.RUNNING);
 
         StringBuilder u = new StringBuilder();
         List<String> ips = Util.ipv4();
-        if (ips.isEmpty()) u.append("Nessuna rete Wi-Fi: raggiungibile solo da questo telefono.\n");
+        if (ips.isEmpty()) u.append("No Wi-Fi network: reachable only from this phone.\n");
         for (String ip : ips) u.append("http://").append(ip.substring(ip.indexOf(' ') + 1)).append(':').append(cfg.port()).append("   (").append(ip.substring(0, ip.indexOf(' '))).append(")\n");
-        u.append("http://127.0.0.1:").append(cfg.port()).append("   (questo telefono)");
+        u.append("http://127.0.0.1:").append(cfg.port()).append("   (this phone)");
         urls.setText(u.toString());
 
-        health.setText("Risparmio batteria: " + (Health.ignoringBattery(this) ? "escluso (ok)" : "attivo (Android può fermare il server)")
-            + "\nRestrizioni processi figli: " + Health.phantomText(this));
+        health.setText("Battery optimization: " + (Health.ignoringBattery(this) ? "excluded (ok)" : "active (Android may stop the server)")
+            + "\nChild process restrictions: " + Health.phantomText(this));
         int spaceLvl = Health.spaceLevel(cfg.files);
-        storage.setText("Spazio: " + Health.spaceText(cfg.files));
+        storage.setText("Storage: " + Health.spaceText(cfg.files));
         storage.setTextColor(spaceLvl == 1 ? C_ERR : spaceLvl == 0 ? C_WARN : C_MUTED);
 
         exportStatus.setText(Exporter.status() + "\n" + Exporter.stagedInfo(cfg));
@@ -798,14 +798,14 @@ public class MainActivity extends Activity {
         dcimStatus.setText(DcimMode.status(cfg));
         missingStatus.setText(MissingCleaner.status(cfg));
 
-        backupBtn.setText(Backup.running() ? "Ferma la copia" : "Copia ora sul telefono");
+        backupBtn.setText(Backup.running() ? "Stop the copy" : "Copy to the phone now");
         backupStatus.setText(Backup.status());
-        batteryStatus.setText("Batteria ora: " + BatteryGuard.statusText(this));
+        batteryStatus.setText("Battery now: " + BatteryGuard.statusText(this));
 
         String txt = currentLog();
         if (!txt.equals(lastLog)) {
             lastLog = txt;
-            logView.setText(txt.isEmpty() ? "(vuoto)" : txt);
+            logView.setText(txt.isEmpty() ? "(empty)" : txt);
         }
     }
 
@@ -829,7 +829,7 @@ public class MainActivity extends Activity {
 
     private void runDiagnosis() {
         source.setSelection(4);
-        diagText = "Diagnosi in corso…";
+        diagText = "Running diagnostics…";
         refresh();
         new Thread(new Runnable() {
             @Override
@@ -848,11 +848,11 @@ public class MainActivity extends Activity {
 
     private void confirmRepair() {
         new AlertDialog.Builder(this)
-            .setTitle("Ripara")
-            .setMessage("Ferma il server e cancella il sistema Debian e il pacchetto Immich, poi li reinstalla al "
-                + "prossimo avvio (servono internet e 10-30 minuti). Il database e le foto NON vengono toccati.")
-            .setNegativeButton("Annulla", null)
-            .setPositiveButton("Ripara", new DialogInterface.OnClickListener() {
+            .setTitle("Repair")
+            .setMessage("Stops the server and deletes the Debian system and the Immich package, then reinstalls them at the "
+                + "next start (needs Internet and 10-30 minutes). The database and the photos are NOT touched.")
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton("Repair", new DialogInterface.OnClickListener() {
                 @Override
                 public void onClick(DialogInterface d, int w) {
                     startService(new Intent(MainActivity.this, ServerService.class).setAction(ServerService.ACTION_STOP));
@@ -862,7 +862,7 @@ public class MainActivity extends Activity {
                             handler.post(new Runnable() {
                                 @Override
                                 public void run() {
-                                    Toast.makeText(MainActivity.this, "Fatto: premi Installa e avvia", Toast.LENGTH_LONG).show();
+                                    Toast.makeText(MainActivity.this, "Done: press Install and start", Toast.LENGTH_LONG).show();
                                 }
                             });
                         }
@@ -881,35 +881,35 @@ public class MainActivity extends Activity {
                 startActivity(new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS));
             }
         } catch (Exception e) {
-            Toast.makeText(this, "Apri Impostazioni → App → Immich Server → Batteria → Senza restrizioni", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, "Open Settings → Apps → Immich Server → Battery → Unrestricted", Toast.LENGTH_LONG).show();
         }
     }
 
     private void phantomDialog() {
         final boolean canWrite = Health.canWriteSecure(this);
-        String msg = "Da Android 12 il sistema uccide i processi \"figli\" di un'app quando sono più di 32: PostgreSQL, "
-            + "Valkey, Node.js e ffmpeg ne creano molti, quindi senza questa impostazione il server si ferma a caso.\n\n"
-            + "Stato attuale: " + Health.phantomText(this) + "\n\n"
-            + "Modo più semplice: Impostazioni → Sistema → Opzioni sviluppatore → \"Disattiva restrizioni processi figli\".\n\n"
-            + "Oppure, dal PC con il telefono collegato:\n" + Health.adbCommands(this);
+        String msg = "Since Android 12 the system kills an app's \"child\" processes when there are more than 32: PostgreSQL, "
+            + "Valkey, Node.js and ffmpeg start many, so without this setting the server stops at random.\n\n"
+            + "Now: " + Health.phantomText(this) + "\n\n"
+            + "Easiest way (Android 14+): Settings → System → Developer options → \"Disable child process restrictions\".\n\n"
+            + "Or, from a PC with the phone connected:\n" + Health.adbCommands(this);
         AlertDialog.Builder b = new AlertDialog.Builder(this)
-            .setTitle("Restrizioni sui processi figli")
+            .setTitle("Child process restrictions")
             .setMessage(msg)
-            .setNeutralButton("Copia comandi adb", new DialogInterface.OnClickListener() {
+            .setNeutralButton("Copy adb commands", new DialogInterface.OnClickListener() {
                 @Override
                 public void onClick(DialogInterface d, int w) {
                     ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
                     cm.setPrimaryClip(ClipData.newPlainText("adb", Health.adbCommands(MainActivity.this)));
-                    Toast.makeText(MainActivity.this, "Copiati", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(MainActivity.this, "Copied", Toast.LENGTH_SHORT).show();
                 }
             })
-            .setNegativeButton("Chiudi", null);
+            .setNegativeButton("Close", null);
         if (canWrite) {
-            b.setPositiveButton("Disattiva ora", new DialogInterface.OnClickListener() {
+            b.setPositiveButton("Turn off now", new DialogInterface.OnClickListener() {
                 @Override
                 public void onClick(DialogInterface d, int w) {
                     boolean ok = Health.setPhantomRestrictions(MainActivity.this, false);
-                    Toast.makeText(MainActivity.this, ok ? "Fatto" : "Non riuscito", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(MainActivity.this, ok ? "Done" : "Failed", Toast.LENGTH_SHORT).show();
                 }
             });
         }
