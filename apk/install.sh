@@ -54,7 +54,7 @@ fi
 A=(adb -s "$SERIAL")
 
 log "telefono: $("${A[@]}" shell getprop ro.product.model | tr -d '\r') · Android $("${A[@]}" shell getprop ro.build.version.release | tr -d '\r') · $("${A[@]}" shell getprop ro.product.cpu.abilist | tr -d '\r')"
-"${A[@]}" shell getprop ro.product.cpu.abilist | grep -q arm64 || die "serve un telefono arm64-v8a"
+"${A[@]}" shell getprop ro.product.cpu.abilist | grep arm64 >/dev/null || die "serve un telefono arm64-v8a"
 
 log "installo $(basename "$APK") ($(du -h "$APK" | cut -f1))"
 "${A[@]}" install -r "$APK"

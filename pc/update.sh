@@ -70,7 +70,7 @@ BUILT="$(apk_version)"
 log "ultima versione di Immich: $TARGET · APK in dist/: ${BUILT:-nessuno}"
 mapfile -t CONNECTED < <(adb devices | awk 'NR > 1 && $2 == "device" { print $1 }')
 for s in "${CONNECTED[@]}"; do
-  if adb -s "$s" shell pm path "$PKG" 2>/dev/null | grep -q '^package:'; then
+  if adb -s "$s" shell pm path "$PKG" 2>/dev/null | grep '^package:' >/dev/null; then
     v="$(device_version "$s")"
     log "  $s ($(device_name "$s")): ${v:-app installata, server mai avviato}"
   else
@@ -80,7 +80,7 @@ done
 [[ $CHECK == 1 ]] && exit 0
 
 for s in "${SERIALS[@]}"; do
-  printf '%s\n' "${CONNECTED[@]}" | grep -qxF "$s" || die "dispositivo $s non collegato (adb devices)"
+  printf '%s\n' "${CONNECTED[@]}" | grep -xF "$s" >/dev/null || die "dispositivo $s non collegato (adb devices)"
 done
 
 # --- compilazione, solo se serve --------------------------------------------

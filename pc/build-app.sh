@@ -219,8 +219,11 @@ restore_ws
 
 D="$WORK/deploy/server"
 [[ -f "$D/dist/main.js" ]] || die "dist/main.js mancante dopo il deploy"
-ls "$D/node_modules/.pnpm" | grep -q '^@img+sharp-linux-arm64@' || die "manca il binario sharp per linux-arm64"
-if ls "$D/node_modules/.pnpm" | grep -q -E '^@img\+sharp(-libvips)?-linux-x64@'; then
+# con un glob, non "ls | grep -q": con pipefail grep -q che esce al primo risultato fa fallire ls (SIGPIPE) e
+# con lui tutto il controllo, a seconda dei tempi (su GitHub Actions succedeva)
+compgen -G "$D/node_modules/.pnpm/@img+sharp-linux-arm64@*" >/dev/null || die "manca il binario sharp per linux-arm64"
+if compgen -G "$D/node_modules/.pnpm/@img+sharp-linux-x64@*" >/dev/null \
+  || compgen -G "$D/node_modules/.pnpm/@img+sharp-libvips-linux-x64@*" >/dev/null; then
   die "trovati binari x64 nel pacchetto arm64"
 fi
 if command -v file >/dev/null; then
