@@ -353,7 +353,7 @@ public class MainActivity extends Activity {
         root.addView(health, lp(4));
         storage = text("", 13, C_MUTED, false);
         root.addView(storage, lp(2));
-        root.addView(button("Esclui dal risparmio batteria", new View.OnClickListener() {
+        root.addView(button("Escludi dal risparmio batteria", new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 batterySettings();

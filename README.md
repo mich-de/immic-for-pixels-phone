@@ -11,6 +11,7 @@ in Italian: its buttons are quoted below as they appear, with a translation.
 
 Ready-made APKs for every Immich version: [Releases](https://github.com/mich-de/immic-for-pixels-phone/releases)
 (built and published automatically by a GitHub workflow, see [Automatic releases](#automatic-releases-on-github)).
+To just install one, without building anything: [Quick start](#quick-start-just-install-it).
 
 ```
 ┌──────────────────────── "Immich Server" APK (Java, ~290 MB) ─────────────────────────┐
@@ -24,6 +25,39 @@ Ready-made APKs for every Immich version: [Releases](https://github.com/mich-de/
 
 Immich doesn't officially support Android as a server platform: here it is built from source and installed "ad hoc"
 (see [How it works](#how-it-works)).
+
+## Quick start: just install it
+
+Nothing to build: every Immich version is already built in
+[Releases](https://github.com/mich-de/immic-for-pixels-phone/releases). No PC is needed, except for one setting on
+Android 12–13 (step 3).
+
+1. **On the phone that will be the server** (arm64, Android 8+, at least 6 GB of RAM and several GB free): open the
+   [latest release](https://github.com/mich-de/immic-for-pixels-phone/releases/latest), download `immich-server.apk`
+   (~290 MB) and open it. Let the browser install apps when Android asks, and choose *Install anyway* if Play Protect
+   says it doesn't know the app.
+2. Open **Immich Server** and press **Installa e avvia** (Install and start). The first time it needs Internet and
+   10–15 minutes: keep the phone on and plugged in. When the status reads **In esecuzione** (Running), the app shows
+   the server address, for example `http://192.168.1.20:2283`.
+3. So that Android doesn't stop the server, in the same screen:
+   - **Escludi dal risparmio batteria** (Exclude from battery optimization) → allow;
+   - **Restrizioni sui processi figli** (Child process restrictions): on Android 14 and later turn on *Settings →
+     System → Developer options → Disable child process restrictions* (to show *Developer options*, tap *Build number*
+     7 times in *About phone*); on Android 12–13 it needs a PC with adb: the button shows the commands and copies them;
+   - tick *Avvia il server all'accensione del telefono* (Start the server when the phone boots);
+   - on Samsung, Xiaomi and similar phones also let the app run in the background (Samsung: *Never sleeping apps*;
+     Xiaomi: *Autostart* and battery saver *No restrictions*).
+4. From any device on the same Wi-Fi open that address in a browser and create the admin account.
+5. On your other phones install the official **Immich** app (Play Store, F-Droid or GitHub), enter the same address as
+   *Server URL*, log in and turn on backup.
+
+Good to know:
+- reserve the phone's IP in your router (static DHCP), otherwise the address can change; outside home you need a VPN
+  (see [Reaching it over the network](#reaching-it-over-the-network));
+- keep the server phone on Wi-Fi and charging (see [Keeping it running](#keeping-it-running));
+- **updating**: download the new release's `immich-server.apk` and install it over the old one — photos and database
+  stay, and the server restarts by itself;
+- **never uninstall the app**: uninstalling deletes all photos and the database (see [Data and backups](#data-and-backups)).
 
 ## Requirements
 
