@@ -539,7 +539,7 @@ public class MainActivity extends Activity {
         root.addView(text("Copies Immich's originals (the real files, not the thumbnails) to \"" + Backup.DIR
             + "\" in the phone's storage: a normal folder that any file manager shows, or a PC when the phone is "
             + "connected. In addition to the temporary gallery copy above (meant for Google Photos) and to the PC "
-            + "copy described in the README. Manual and incremental: you can stop it and start it again, it resumes "
+            + "copy described in the docs. Manual and incremental: you can stop it and start it again, it resumes "
             + "where it stopped without copying everything again. It never deletes anything.", 12, C_MUTED, false), lp(4));
         backupBtn = button("Copy to the phone now", new View.OnClickListener() {
             @Override

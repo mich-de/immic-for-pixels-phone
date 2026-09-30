@@ -93,7 +93,7 @@ jobs:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
           if [[ -z "$KEYSTORE_BASE64" ]]; then
-            echo "::error::Missing the KEYSTORE_BASE64 secret: the key the installed APKs are signed with (see README)"
+            echo "::error::Missing the KEYSTORE_BASE64 secret: the key the installed APKs are signed with (see docs/building.md)"
             exit 1
           fi
           base64 -d <<<"$KEYSTORE_BASE64" > apk/immich-server.keystore
@@ -124,7 +124,7 @@ jobs:
 
           - **immich-server.apk**: the full APK — this is the one to install. It installs over the previous version
             without losing photos or database (same signature); on its first start the server updates itself.
-          - **immich-server-lite.apk** + **$(basename "$pack")**: small APK, the package is copied with adb (see README).
+          - **immich-server-lite.apk** + **$(basename "$pack")**: small APK, the package is copied with adb (see docs/building.md).
 
           **To get your photos into Google Photos** (Pixel 1–5): in the app turn on *Keep the originals in DCIM/Immich*,
           then in Google Photos on the same phone turn on the backup of the `admin` folder (*Settings → Backup → Back up

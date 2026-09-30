@@ -14,7 +14,7 @@ import java.io.OutputStream;
  * Copia gli originali di Immich (quelli che stanno in {@code files/immich/library/upload}, nella memoria
  * privata dell'app) in una cartella normale del telefono, visibile con qualunque app "Gestione file" o
  * collegando il telefono al PC: {@link #DIR}. Serve come backup "sul telefono", in aggiunta a quello
- * documentato nel README (via adb, sul PC) e alla copia temporanea in Galleria (Exporter), che invece
+ * documentato in docs/how-it-works.md (via adb, sul PC) e alla copia temporanea in Galleria (Exporter), che invece
  * l'app elimina da sola dopo un po'.
  *
  * Manuale (nessuno schedulario): si avvia dal pulsante "Copia ora sul telefono". È incrementale e si può

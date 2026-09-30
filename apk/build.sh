@@ -3,7 +3,7 @@
 # Costruisce dist/immich-server.apk senza Gradle: aapt2 + javac + d8 + zipalign + apksigner.
 #
 #   apk/build.sh          APK completo (rootfs Debian + pacchetto Immich dentro l'APK, ~280 MB)
-#   apk/build.sh --lite   APK leggero: i due pacchetti grossi si mettono con "adb push" (vedi README)
+#   apk/build.sh --lite   APK leggero: i due pacchetti grossi si mettono con "adb push" (vedi docs/building.md)
 #
 # Prima serve il pacchetto Immich:  pc/build-app.sh
 set -euo pipefail
@@ -163,7 +163,7 @@ KS="$APK/immich-server.keystore"
 # su GitHub Actions (CI=true) la chiave arriva dal segreto KEYSTORE_BASE64: crearne una nuova darebbe un APK che non
 # si installa sopra quello esistente (e disinstallare cancellerebbe foto e database)
 if [[ ! -f "$KS" && -n "${CI:-}" ]]; then
-  die "manca la chiave di firma $KS: su GitHub va nel segreto KEYSTORE_BASE64 (vedi README)"
+  die "manca la chiave di firma $KS: su GitHub va nel segreto KEYSTORE_BASE64 (vedi docs/building.md)"
 fi
 if [[ ! -f "$KS" ]]; then
   log "creo la chiave di firma $KS (conservala: serve per gli aggiornamenti)"
