@@ -523,6 +523,7 @@ final class Stack {
                         DcimMode.afterStart(c);
                         Pruner.runOnce(c);
                         MissingCleaner.runIfDue(Stack.this, c);
+                        Updater.checkIfDue(c, true);
                     }
                     try {
                         Thread.sleep(4000);

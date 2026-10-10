@@ -10,7 +10,7 @@ illimitato gratuito su Google Foto come copia nel cloud. Un solo APK: niente roo
                                   originali a piena qualità                        copia gratuita illimitata
 ```
 
-**[Scarica l'ultimo rilascio](https://github.com/mich-de/immic-for-pixels-phone/releases/latest)** · Immich v3.2.4 ·
+**[Scarica l'ultimo rilascio](https://github.com/mich-de/immic-for-pixels-phone/releases/latest)** · sempre l'ultima versione di Immich ·
 provato su un Pixel 5 (Android 14) · progetto non ufficiale, non affiliato a Immich. L'app è in inglese: qui sotto i
 pulsanti sono citati con il loro nome.
 
@@ -62,8 +62,9 @@ Serve il telefono che farà da server (arm64, Android 8+, qualche GB libero), il
 
 ## Da sapere
 
-- **Non disinstallare mai l'app**: cancella tutte le foto e il database. Per aggiornare installa `immich-server.apk` del
-  rilascio nuovo sopra il vecchio: resta tutto e il server riparte da solo.
+- **Non disinstallare mai l'app**: cancella tutte le foto e il database. Gli aggiornamenti si installano sopra: l'app ti
+  avvisa quando esce una versione nuova e la installa con un tocco (oppure installa tu `immich-server.apk` del rilascio
+  nuovo sopra il vecchio). Resta tutto e il server riparte da solo.
 - **Tieni il telefono server sul Wi-Fi e in carica.** L'app può ricordarti di staccarlo all'80% per non stressare la
   batteria (sezione *Battery*).
 - **Riserva l'indirizzo IP del telefono nel router** (DHCP statico), altrimenti l'indirizzo può cambiare. Fuori casa usa
@@ -83,6 +84,7 @@ Tutto è nell'unica schermata dell'app; dettagli e avvertenze (in inglese) in **
 | [Pulizia delle foto senza file](docs/features.md#cleaning-up-photos-whose-file-is-gone) | Ogni notte sposta nel cestino di Immich le foto il cui originale è stato cancellato da un'altra app |
 | [Backup sul telefono](docs/features.md#backup-on-the-phone) | Copia tutti gli originali in una normale cartella `ImmichBackup` |
 | [Promemoria batteria](docs/features.md#battery-reminder) | Ti ricorda di staccare sopra e riattaccare sotto una certa carica |
+| [Aggiornamenti](docs/features.md#updates) | Ti avvisa quando esce una versione nuova e la installa con un tocco |
 
 ## Cercasi tester
 

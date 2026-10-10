@@ -10,7 +10,7 @@ Google Photos backup as a cloud copy. One APK: no root, no Docker.
                               full-quality originals                       free unlimited copy
 ```
 
-**[Download the latest release](https://github.com/mich-de/immic-for-pixels-phone/releases/latest)** · Immich v3.2.4 ·
+**[Download the latest release](https://github.com/mich-de/immic-for-pixels-phone/releases/latest)** · always the latest Immich ·
 tested on a Pixel 5 (Android 14) · unofficial project, not affiliated with Immich.
 
 ## Why a Pixel 1–5
@@ -62,8 +62,9 @@ You need the phone that will be the server (arm64, Android 8+, a few GB free), y
 
 ## Good to know
 
-- **Never uninstall the app**: that deletes all the photos and the database. To update, install the new release's
-  `immich-server.apk` over the old one: everything stays and the server restarts by itself.
+- **Never uninstall the app**: that deletes all the photos and the database. Updates install over it: the app tells you
+  when a new version is out and installs it with one tap (or install the new release's `immich-server.apk` over the old
+  one yourself). Everything stays and the server restarts by itself.
 - **Keep the server phone on Wi-Fi and plugged in.** The app can remind you to unplug it at 80% to spare the battery
   (*Battery* section).
 - **Reserve the phone's IP address in your router** (static DHCP), or the address can change. Away from home, use a
@@ -83,6 +84,7 @@ Everything is in the app's single screen; details and caveats in **[docs/feature
 | [Clean up photos whose file is gone](docs/features.md#cleaning-up-photos-whose-file-is-gone) | Every night moves to Immich's trash the photos whose original was deleted by another app |
 | [Backup on the phone](docs/features.md#backup-on-the-phone) | Copies all the originals to a normal `ImmichBackup` folder |
 | [Battery reminder](docs/features.md#battery-reminder) | Reminds you to unplug above and plug back in below a charge level |
+| [Updates](docs/features.md#updates) | Tells you when a new version is out and installs it with one tap |
 
 ## Help wanted: testers
 

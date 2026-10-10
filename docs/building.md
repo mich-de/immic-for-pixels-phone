@@ -51,7 +51,8 @@ commands are in the script's header):
 
 ## Update Immich
 
-When Immich publishes a new version (its web page tells the admins):
+Phones running the app don't need a PC for this: the app finds the new release and installs it with one tap (see
+[Updates](features.md#updates)). From a PC, when Immich publishes a new version (its web page tells the admins):
 
 ```sh
 pc/update.sh --check              # published version, the one in dist/, and the one on each connected device

@@ -8,7 +8,7 @@ Technical notes. Back to the [README](../README.md).
 │  proot (Termux binaries) ── runs a Debian 13 (arm64) userland without root           │
 │      ├─ PostgreSQL 17 + pgvector + VectorChord   (data: files/immich/postgres)       │
 │      ├─ Valkey 8                                                                     │
-│      └─ Node 24 + Immich v3.2.4 (server, web, plugins) + jellyfin-ffmpeg + exiftool  │
+│      └─ Node 24 + Immich (server, web, plugins) + jellyfin-ffmpeg + exiftool         │
 └──────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -75,7 +75,7 @@ apk/build.sh           builds and signs the APK (aapt2, javac, d8, apksigner: no
 apk/install.sh         installs on a phone via adb and prepares Android
 apk/src/…              the app: Stack (setup and services), ProotCmd, Tar, Configs, ServerService, MainActivity,
                        Exporter/Pruner (Google Photos), DcimMode (originals in DCIM), MissingCleaner, Backup,
-                       BatteryGuard
+                       BatteryGuard, Updater (updates from Releases)
 apk/assets/guest/      the script that installs PostgreSQL, Valkey and jellyfin-ffmpeg inside Debian
 apk/vendor/            pinned Termux packages for proot
 apk/test/              PC-side tests: tar extractor (TarCheck) and configurations (ConfigsDump)
@@ -90,7 +90,8 @@ and HDR videos uploaded from another phone:
 - fresh install from the single APK: ~7 minutes to Immich's first answer; later starts ~40 s;
 - clean shutdown in under 5 s, automatic restart of a crashed service, recovery after an abrupt power-off;
 - uploads with thumbnails, metadata and video transcoding (HEVC and HDR included);
-- update from Immich 3.2.2 to 3.2.4 with about 4 minutes of downtime;
+- updates from Immich 3.2.2 to 3.2.4 (about 4 minutes of downtime) and from 3.2.4 to 3.3.1 (about 2 minutes, four
+  database migrations);
 - originals moved into `DCIM/Immich`: 395 files (9.96 GB) in about 2 minutes, SHA-1 of all 383 photos identical to
   Immich's database;
 - idle, the whole stack uses roughly 0.7–1 GB of RAM.

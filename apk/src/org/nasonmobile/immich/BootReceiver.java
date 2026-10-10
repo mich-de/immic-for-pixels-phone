@@ -15,6 +15,11 @@ public class BootReceiver extends BroadcastReceiver {
         String a = intent.getAction();
         boolean start = Intent.ACTION_BOOT_COMPLETED.equals(a) ? c.autostart()
             : Intent.ACTION_MY_PACKAGE_REPLACED.equals(a) && c.shouldRun();
+        if (Intent.ACTION_MY_PACKAGE_REPLACED.equals(a)) {
+            // aggiornata: via l'avviso dell'aggiornamento, e il prossimo controllo si fa subito (vedi Updater)
+            Updater.cancelNotification(context);
+            c.prefs.edit().remove("update_checked_at").apply();
+        }
         if (start) {
             context.startForegroundService(new Intent(context, ServerService.class).setAction(ServerService.ACTION_START));
         }

@@ -45,6 +45,9 @@ public class MainActivity extends Activity {
     private static final int REQ_STORAGE = 100;
     private static final int REQ_STORAGE_DCIM = 101;
 
+    /** in primo piano: la finestra di conferma di un aggiornamento si può aprire subito (vedi Updater.onStatus) */
+    static volatile boolean resumed;
+
     private final Handler handler = new Handler(Looper.getMainLooper());
     private Cfg cfg;
 
@@ -59,6 +62,9 @@ public class MainActivity extends Activity {
     private TextView batteryStatus;
     private TextView dcimStatus;
     private TextView missingStatus;
+    private TextView updateStatus;
+    private Button updateBtn;
+    private String installedVersion = "";
     private CheckBox dcimBox;
     private EditText apiKeyField;
     private TextView logView;
@@ -83,7 +89,8 @@ public class MainActivity extends Activity {
         super.onCreate(b);
         cfg = new Cfg(this);
         setContentView(buildUi());
-        handleIntent(getIntent());
+        // ricreata (rotazione, ritorno dopo che Android l'ha chiusa): i comandi dell'intent sono già stati eseguiti
+        if (b == null) handleIntent(getIntent());
     }
 
     /** L'attività è singleTask: se è già aperta, "adb shell am start ..." arriva qui invece che in onCreate. */
@@ -101,10 +108,26 @@ public class MainActivity extends Activity {
      * "--ez dcim_originals true|false" interruttore degli originali in DCIM (serve il permesso Memoria, da adb:
      * pm grant org.nasonmobile.immich android.permission.WRITE_EXTERNAL_STORAGE); "--ez missing_cleanup true|false"
      * pulizia notturna delle foto senza file; "--ez missing_cleanup_now true" la fa subito; "--ez restart true"
-     * riavvia il server (anche dopo gli interruttori, che si applicano all'avvio).
+     * riavvia il server (anche dopo gli interruttori, che si applicano all'avvio); "--ez update_check true" controlla
+     * subito gli aggiornamenti, con la notifica; "--es update_pretend_installed v3.3.0" finge installata una versione
+     * più vecchia, per provare il flusso dell'aggiornamento (vale finché l'app non si chiude).
      */
     private void handleIntent(final Intent in) {
         if (in == null) return;
+        if (in.hasExtra("update_pretend_installed")) {
+            String p = in.getStringExtra("update_pretend_installed");
+            Updater.pretendInstalled = p == null ? "" : p.trim();
+        }
+        if (in.getBooleanExtra("update_check", false)) {
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    android.util.Log.i(Cfg.TAG, "update check from adb: " + Updater.checkNow(cfg, true));
+                }
+            }, "immich-update").start();
+        }
+        // dalla notifica "è disponibile": si ricontrolla (il processo può essere ripartito) e si propone
+        if (in.getBooleanExtra("update_install", false)) checkThenOffer();
         if (in.hasExtra("dcim_originals")) {
             boolean on = in.getBooleanExtra("dcim_originals", false);
             DcimMode.onSwitch(cfg, on);
@@ -190,13 +213,77 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        resumed = true;
+        installedVersion = Updater.current(cfg);
         handler.post(tick);
+        // nessun controllo ancora in questo processo (app appena aperta o aggiornata): uno subito, senza notifica
+        if (Updater.status().isEmpty() && cfg.prefs.getBoolean("update_check", true)) {
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    Updater.checkNow(cfg, false);
+                }
+            }, "immich-update").start();
+        }
     }
 
     @Override
     protected void onPause() {
+        resumed = false;
         handler.removeCallbacks(tick);
         super.onPause();
+    }
+
+    private void checkThenOffer() {
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                final String r = Updater.checkNow(cfg, false);
+                handler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (Updater.available() != null) {
+                            offerUpdate();
+                        } else {
+                            Toast.makeText(MainActivity.this, r, Toast.LENGTH_LONG).show();
+                        }
+                    }
+                });
+            }
+        }, "immich-update").start();
+    }
+
+    /** prima il permesso di installare app (una volta sola), poi la conferma, poi il download (vedi Updater) */
+    private void offerUpdate() {
+        final Updater.Release r = Updater.available();
+        if (r == null || Updater.busy() || isFinishing() || isDestroyed()) return;
+        if (!getPackageManager().canRequestPackageInstalls()) {
+            Toast.makeText(this, "Allow Immich Server to install apps, then come back and press Update again", Toast.LENGTH_LONG).show();
+            try {
+                startActivity(new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + getPackageName())));
+            } catch (Exception e) {
+                Toast.makeText(this, "Settings → Apps → Immich Server → Install unknown apps → Allow", Toast.LENGTH_LONG).show();
+            }
+            return;
+        }
+        new AlertDialog.Builder(this)
+            .setTitle(r.title())
+            .setMessage("Downloads the new app (" + (r.size > 0 ? (r.size >> 20) + " MB" : "about 300 MB") + ") and asks "
+                + "Android to install it over this one. Photos, database and settings stay. During the update the server "
+                + "stops for a few minutes, then it starts again by itself.")
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton("Download and install", new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface d, int w) {
+                    new Thread(new Runnable() {
+                        @Override
+                        public void run() {
+                            Updater.downloadAndInstall(cfg.ctx, r);
+                        }
+                    }, "immich-update").start();
+                }
+            })
+            .show();
     }
 
     @Override
@@ -454,6 +541,52 @@ public class MainActivity extends Activity {
             }
         });
         root.addView(auto, lp(6));
+
+        root.addView(text("Updates", 16, C_TEXT, true), lp(26));
+        root.addView(text("Every new Immich version is built and published on GitHub automatically, usually within a day. "
+            + "The app checks once a day and sends you a notification. Updating takes one tap: the app downloads the new "
+            + "version (about 300 MB) and Android asks you to confirm; the first time it also asks you to allow Immich "
+            + "Server to install apps. Photos, database and settings stay; the server stops for a few minutes and starts "
+            + "again by itself.", 12, C_MUTED, false), lp(4));
+        CheckBox upd = new CheckBox(this);
+        upd.setText("Check for updates every day");
+        upd.setChecked(cfg.prefs.getBoolean("update_check", true));
+        upd.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton b, boolean checked) {
+                cfg.prefs.edit().putBoolean("update_check", checked).apply();
+            }
+        });
+        root.addView(upd, lp(6));
+        updateStatus = text("", 12, C_MUTED, false);
+        root.addView(updateStatus, lp(2));
+        LinearLayout updRow = new LinearLayout(this);
+        updRow.setOrientation(LinearLayout.HORIZONTAL);
+        updRow.addView(button("Check now", new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        final String r = Updater.checkNow(cfg, false);
+                        handler.post(new Runnable() {
+                            @Override
+                            public void run() {
+                                Toast.makeText(MainActivity.this, r, Toast.LENGTH_LONG).show();
+                            }
+                        });
+                    }
+                }, "immich-update").start();
+            }
+        }), new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        updateBtn = button("Update", new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                offerUpdate();
+            }
+        });
+        updRow.addView(updateBtn, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        root.addView(updRow, lp(4));
 
         root.addView(text("Gallery and Google Photos", 16, C_TEXT, true), lp(26));
         root.addView(text("Photos uploaded to Immich live in the app's private storage: Gallery, Files and Google Photos can't see "
@@ -797,6 +930,23 @@ public class MainActivity extends Activity {
         pruneStatus.setText(Pruner.status());
         dcimStatus.setText(DcimMode.status(cfg));
         missingStatus.setText(MissingCleaner.status(cfg));
+
+        String us = Updater.status();
+        if (us.isEmpty() && !cfg.prefs.getBoolean("update_check", true)) us = "Automatic checks are off.";
+        updateStatus.setText("Installed: Immich " + (installedVersion.isEmpty() ? "(not yet)" : installedVersion)
+            + (us.isEmpty() ? "" : "\n" + us));
+        Updater.Release up = Updater.available();
+        updateBtn.setEnabled(up != null && !Updater.busy());
+        updateBtn.setText(Updater.busy() ? "Downloading…" : up == null ? "Update" : up.rebuild ? "Install the new build"
+            : "Update to " + up.tag);
+        Intent confirm = Updater.takeConfirm();
+        if (confirm != null) {
+            try {
+                startActivity(confirm);
+            } catch (Exception e) {
+                Toast.makeText(this, "Android's install window didn't open: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            }
+        }
 
         backupBtn.setText(Backup.running() ? "Stop the copy" : "Copy to the phone now");
         backupStatus.setText(Backup.status());

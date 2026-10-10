@@ -11,6 +11,7 @@ Every option of the app, with its caveats. Back to the [README](../README.md).
 - [Backup on the phone](#backup-on-the-phone)
 - [Battery reminder](#battery-reminder)
 - [Storage warnings](#storage-warnings)
+- [Updates](#updates)
 - [Advanced](#advanced)
 
 ## Where the photos are
@@ -148,6 +149,26 @@ Below 2 GB free, the app shows the free space in yellow and the server notificat
 500 MB it turns red (*STORAGE ALMOST FULL*): PostgreSQL and the copies may stall. To free space on the server, in
 Immich use *Utilities → Review large files*, then *Empty trash* (deleted photos only free space once the trash is
 emptied, or after 30 days).
+
+## Updates
+
+Every new Immich version is built and published in this repository's
+[Releases](https://github.com/mich-de/immic-for-pixels-phone/releases) automatically, usually within a day (see
+[building.md](building.md#automatic-releases)). The app checks once a day and sends a notification when there is a new
+release; the *Updates* section shows the installed version and the result of the last check.
+
+To update, tap the notification or press **Update to vX**: the app downloads the new APK (about 300 MB), checks it
+against the checksum GitHub publishes and hands it to Android, which asks you to confirm. The first time, Android also
+asks you to allow *Immich Server* to install apps: allow it, go back and press the button again. Photos, database and
+settings stay; the server stops for a few minutes, starts again by itself and Immich updates its database.
+
+- Nothing is installed without your tap: an update stops the server for a while, so you choose when.
+- Android only accepts an update signed with the same key as the installed app.
+- A release rebuilt with fixes to the app for the same Immich version is offered too, as a *new build*.
+- Untick **Check for updates every day** to turn off the automatic checks and the notification; **Check now** still
+  works.
+- Builds published before this feature (up to the first v3.3.1 build of 9 October 2026) don't check: install a newer
+  `immich-server.apk` over them once, by hand, as described in the [README](../README.md#good-to-know).
 
 ## Advanced
 

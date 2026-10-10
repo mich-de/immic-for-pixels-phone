@@ -19,6 +19,8 @@
          (niente scoped storage), come per Termux: serve al backup della libreria fuori dalla cartella privata. -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <!-- aggiornamenti dall'app (vedi Updater): Android chiede comunque conferma a ogni installazione -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <application
         android:label="Immich Server"
@@ -52,5 +54,9 @@
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
         </receiver>
+
+        <receiver
+            android:name=".UpdateReceiver"
+            android:exported="false" />
     </application>
 </manifest>

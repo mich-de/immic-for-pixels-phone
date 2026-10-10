@@ -123,7 +123,8 @@ jobs:
           Unofficial project, not affiliated with Immich.
 
           - **immich-server.apk**: the full APK — this is the one to install. It installs over the previous version
-            without losing photos or database (same signature); on its first start the server updates itself.
+            without losing photos or database (same signature); on its first start the server updates itself. If you
+            already have the app, it tells you about new releases and installs them with one tap (*Updates* section).
           - **immich-server-lite.apk** + **$(basename "$pack")**: small APK, the package is copied with adb (see docs/building.md).
 
           **To get your photos into Google Photos** (Pixel 1–5): in the app turn on *Keep the originals in DCIM/Immich*,
