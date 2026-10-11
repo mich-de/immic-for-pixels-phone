@@ -1,6 +1,8 @@
 package org.nasonmobile.immich;
 
 import android.Manifest;
+import android.animation.ObjectAnimator;
+import android.animation.ValueAnimator;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.ClipData;
@@ -9,8 +11,12 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.RippleDrawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
@@ -42,6 +48,9 @@ public class MainActivity extends Activity {
     private static final int C_WARN = Color.parseColor("#B26A00");
     private static final int C_ERR = Color.parseColor("#B3261E");
     private static final int C_ACCENT = Color.parseColor("#3B4BA8");
+    private static final int C_BG = Color.parseColor("#EDF0F8");      // sfondo dietro le card
+    private static final int C_CARD = Color.parseColor("#FFFFFF");    // sfondo delle card
+    private static final int C_SURFACE = Color.parseColor("#F1F3F9"); // campi/spinner/log dentro una card
     private static final int REQ_STORAGE = 100;
     private static final int REQ_STORAGE_DCIM = 101;
 
@@ -75,6 +84,9 @@ public class MainActivity extends Activity {
     private Spinner source;
     private String diagText = "";
     private String lastLog = "";
+    // per sfumare il colore dello stato invece di farlo scattare (vedi refresh() e animateColor())
+    private boolean statusColorShown;
+    private int shownStatusColor;
 
     private final Runnable tick = new Runnable() {
         @Override
@@ -378,6 +390,11 @@ public class MainActivity extends Activity {
     }
 
     // ------------------------------------------------------------------ interfaccia
+    //
+    // Niente Gradle in questo progetto (apk/build.sh è aapt2+javac+d8+apksigner), quindi niente
+    // Compose/Material Components/AppCompat: ogni forma, colore e animazione qui sotto è framework puro,
+    // pensata per restare compilabile da quella catena senza aggiungere dipendenze.
+    // Vedi .claude/skills/android-view-polish/SKILL.md.
 
     private int dp(int v) {
         return (int) (v * getResources().getDisplayMetrics().density + 0.5f);
@@ -399,12 +416,64 @@ public class MainActivity extends Activity {
         return p;
     }
 
+    /** il secondo elemento di una riga di due bottoni/campi, con un piccolo distacco dal primo */
+    private LinearLayout.LayoutParams rowItem(boolean first) {
+        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        if (!first) p.leftMargin = dp(10);
+        return p;
+    }
+
+    private GradientDrawable shape(int fill, int radiusDp) {
+        GradientDrawable d = new GradientDrawable();
+        d.setColor(fill);
+        d.setCornerRadius(dp(radiusDp));
+        return d;
+    }
+
+    private Drawable ripple(int fill, int radiusDp, int rippleColorArgb) {
+        return new RippleDrawable(ColorStateList.valueOf(rippleColorArgb), shape(fill, radiusDp), null);
+    }
+
+    /** una card bianca, leggermente sollevata sullo sfondo: il raggruppamento visivo di ogni sezione */
+    private LinearLayout card() {
+        LinearLayout c = new LinearLayout(this);
+        c.setOrientation(LinearLayout.VERTICAL);
+        c.setPadding(dp(16), dp(16), dp(16), dp(16));
+        c.setBackground(shape(C_CARD, 16));
+        c.setElevation(dp(2));
+        return c;
+    }
+
+    /** bottone "tonale" (sfondo tenue, testo colorato): l'azione normale dentro una card */
     private Button button(String label, View.OnClickListener l) {
         Button b = new Button(this);
         b.setText(label);
         b.setAllCaps(false);
+        b.setTypeface(Typeface.DEFAULT_BOLD);
+        b.setTextColor(C_ACCENT);
+        b.setPadding(dp(16), dp(11), dp(16), dp(11));
+        b.setMinimumWidth(0);
+        b.setMinimumHeight(0);
+        b.setStateListAnimator(null);
+        b.setElevation(0);
+        int tint = Color.argb(28, Color.red(C_ACCENT), Color.green(C_ACCENT), Color.blue(C_ACCENT));
+        b.setBackground(ripple(tint, 12, Color.argb(45, 0, 0, 0)));
         b.setOnClickListener(l);
         return b;
+    }
+
+    /** bottone "pieno": la singola azione più importante di una card (avvia il server, installa l'aggiornamento) */
+    private Button primaryButton(String label, View.OnClickListener l) {
+        Button b = button(label, l);
+        b.setTextColor(Color.WHITE);
+        b.setBackground(ripple(C_ACCENT, 12, Color.argb(90, 255, 255, 255)));
+        return b;
+    }
+
+    /** sfondo tenue per spinner e campi di testo dentro una card: altrimenti sembrano incollati sul bianco */
+    private void surface(View v) {
+        v.setBackground(shape(C_SURFACE, 10));
+        v.setPadding(dp(12), dp(10), dp(12), dp(10));
     }
 
     /** menu a tendina legato a un'impostazione intera */
@@ -425,7 +494,30 @@ public class MainActivity extends Activity {
             public void onNothingSelected(AdapterView<?> p) {
             }
         });
+        surface(sp);
         return sp;
+    }
+
+    /**
+     * I bottoni qui sopra hanno un colore di testo e uno sfondo fissi (non una ColorStateList), quindi
+     * setEnabled(false) da solo non li farebbe più sembrare spenti: l'opacità è il segnale al suo posto.
+     */
+    private void setEnabledLook(Button b, boolean enabled) {
+        b.setEnabled(enabled);
+        b.setAlpha(enabled ? 1f : 0.45f);
+    }
+
+    /** sfuma il colore del testo invece di farlo scattare, quando lo stato cambia (vedi refresh()) */
+    private void animateColor(final TextView tv, int from, int to) {
+        ValueAnimator va = ValueAnimator.ofArgb(from, to);
+        va.setDuration(250);
+        va.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+            @Override
+            public void onAnimationUpdate(ValueAnimator a) {
+                tv.setTextColor((Integer) a.getAnimatedValue());
+            }
+        });
+        va.start();
     }
 
     private void confirmPurge() {
@@ -475,30 +567,30 @@ public class MainActivity extends Activity {
 
     private View buildUi() {
         ScrollView sv = new ScrollView(this);
-        sv.setBackgroundColor(Color.parseColor("#F6F7FB"));
+        sv.setBackgroundColor(C_BG);
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(18), dp(16), dp(18), dp(28));
+        root.setPadding(dp(16), dp(16), dp(16), dp(28));
         sv.addView(root);
 
         root.addView(text("Immich Server", 24, C_TEXT, true));
         root.addView(text("Your photo and video server, on this phone", 14, C_MUTED, false), lp(2));
 
+        // ---- card principale: stato, avanzamento, indirizzo, avvio/arresto ----
+        LinearLayout hero = card();
         status = text("", 20, C_TEXT, true);
-        root.addView(status, lp(20));
+        hero.addView(status);
         detail = text("", 14, C_MUTED, false);
-        root.addView(detail, lp(2));
+        hero.addView(detail, lp(2));
         bar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
         bar.setMax(100);
-        root.addView(bar, lp(8));
-
+        hero.addView(bar, lp(10));
         urls = text("", 15, C_ACCENT, false);
         urls.setTextIsSelectable(true);
-        root.addView(urls, lp(12));
-
+        hero.addView(urls, lp(12));
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
-        mainBtn = button("Install and start", new View.OnClickListener() {
+        mainBtn = primaryButton("Install and start", new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 toggle();
@@ -510,29 +602,33 @@ public class MainActivity extends Activity {
                 startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("http://127.0.0.1:" + cfg.port())));
             }
         });
-        row.addView(mainBtn, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-        row.addView(openBtn, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-        root.addView(row, lp(10));
+        row.addView(mainBtn, rowItem(true));
+        row.addView(openBtn, rowItem(false));
+        hero.addView(row, lp(14));
+        root.addView(hero, lp(18));
 
-        root.addView(text("Keeping the server alive", 16, C_TEXT, true), lp(26));
+        // ---- mantenere il server vivo ----
+        LinearLayout aliveCard = card();
+        aliveCard.addView(text("Keeping the server alive", 16, C_TEXT, true));
         health = text("", 13, C_MUTED, false);
-        root.addView(health, lp(4));
+        aliveCard.addView(health, lp(8));
         storage = text("", 13, C_MUTED, false);
-        root.addView(storage, lp(2));
-        root.addView(button("Exclude from battery optimization", new View.OnClickListener() {
+        aliveCard.addView(storage, lp(2));
+        aliveCard.addView(button("Exclude from battery optimization", new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 batterySettings();
             }
-        }), lp(6));
-        root.addView(button("Child process restrictions (Android 12+)", new View.OnClickListener() {
+        }), lp(10));
+        aliveCard.addView(button("Child process restrictions (Android 12+)", new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 phantomDialog();
             }
-        }), lp(0));
+        }), lp(8));
         CheckBox auto = new CheckBox(this);
         auto.setText("Start the server when the phone boots");
+        auto.setButtonTintList(ColorStateList.valueOf(C_ACCENT));
         auto.setChecked(cfg.autostart());
         auto.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
@@ -540,16 +636,20 @@ public class MainActivity extends Activity {
                 cfg.setAutostart(checked);
             }
         });
-        root.addView(auto, lp(6));
+        aliveCard.addView(auto, lp(10));
+        root.addView(aliveCard, lp(14));
 
-        root.addView(text("Updates", 16, C_TEXT, true), lp(26));
-        root.addView(text("Every new Immich version is built and published on GitHub automatically, usually within a day. "
+        // ---- aggiornamenti ----
+        LinearLayout updatesCard = card();
+        updatesCard.addView(text("Updates", 16, C_TEXT, true));
+        updatesCard.addView(text("Every new Immich version is built and published on GitHub automatically, usually within a day. "
             + "The app checks once a day and sends you a notification. Updating takes one tap: the app downloads the new "
             + "version (about 300 MB) and Android asks you to confirm; the first time it also asks you to allow Immich "
             + "Server to install apps. Photos, database and settings stay; the server stops for a few minutes and starts "
-            + "again by itself.", 12, C_MUTED, false), lp(4));
+            + "again by itself.", 12, C_MUTED, false), lp(6));
         CheckBox upd = new CheckBox(this);
         upd.setText("Check for updates every day");
+        upd.setButtonTintList(ColorStateList.valueOf(C_ACCENT));
         upd.setChecked(cfg.prefs.getBoolean("update_check", true));
         upd.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
@@ -557,9 +657,9 @@ public class MainActivity extends Activity {
                 cfg.prefs.edit().putBoolean("update_check", checked).apply();
             }
         });
-        root.addView(upd, lp(6));
+        updatesCard.addView(upd, lp(10));
         updateStatus = text("", 12, C_MUTED, false);
-        root.addView(updateStatus, lp(2));
+        updatesCard.addView(updateStatus, lp(4));
         LinearLayout updRow = new LinearLayout(this);
         updRow.setOrientation(LinearLayout.HORIZONTAL);
         updRow.addView(button("Check now", new View.OnClickListener() {
@@ -578,26 +678,30 @@ public class MainActivity extends Activity {
                     }
                 }, "immich-update").start();
             }
-        }), new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-        updateBtn = button("Update", new View.OnClickListener() {
+        }), rowItem(true));
+        updateBtn = primaryButton("Update", new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 offerUpdate();
             }
         });
-        updRow.addView(updateBtn, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-        root.addView(updRow, lp(4));
+        updRow.addView(updateBtn, rowItem(false));
+        updatesCard.addView(updRow, lp(10));
+        root.addView(updatesCard, lp(14));
 
-        root.addView(text("Gallery and Google Photos", 16, C_TEXT, true), lp(26));
-        root.addView(text("Photos uploaded to Immich live in the app's private storage: Gallery, Files and Google Photos can't see "
+        // ---- galleria e Google Foto ----
+        LinearLayout galleryCard = card();
+        galleryCard.addView(text("Gallery and Google Photos", 16, C_TEXT, true));
+        galleryCard.addView(text("Photos uploaded to Immich live in the app's private storage: Gallery, Files and Google Photos can't see "
             + "them, and Google Photos can only upload files from shared storage. So the app makes a TEMPORARY copy in "
             + "DCIM/Immich and deletes it by itself later: the original stays in Immich and, after the backup, in Google's "
             + "cloud too. Once, in Google Photos: Settings → Backup → Back up device folders → turn on \"Immich\". To free "
             + "the space earlier use Google Photos' \"Free up space\". On Pixel 2–5 the unlimited storage is in \"Storage "
             + "saver\" quality (photos at 16 MP, videos at 1080p). Don't back up the \"Immich\" folder with the Immich app: "
-            + "it would send the photos back to the server.", 12, C_MUTED, false), lp(4));
+            + "it would send the photos back to the server.", 12, C_MUTED, false), lp(6));
         CheckBox exp = new CheckBox(this);
         exp.setText("Copy new photos to the gallery automatically");
+        exp.setButtonTintList(ColorStateList.valueOf(C_ACCENT));
         exp.setChecked(cfg.prefs.getBoolean("export_enabled", false));
         exp.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
@@ -605,9 +709,10 @@ public class MainActivity extends Activity {
                 cfg.prefs.edit().putBoolean("export_enabled", checked).apply();
             }
         });
-        root.addView(exp, lp(6));
+        galleryCard.addView(exp, lp(10));
         CheckBox expAll = new CheckBox(this);
         expAll.setText("Include the photos of the other Immich users too");
+        expAll.setButtonTintList(ColorStateList.valueOf(C_ACCENT));
         expAll.setChecked(cfg.prefs.getBoolean("export_all_users", false));
         expAll.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
@@ -615,13 +720,13 @@ public class MainActivity extends Activity {
                 cfg.prefs.edit().putBoolean("export_all_users", checked).apply();
             }
         });
-        root.addView(expAll, lp(0));
-        root.addView(text("Delete the gallery copy after", 13, C_TEXT, false), lp(10));
-        root.addView(prefSpinner("export_keep_days", new String[]{"Never", "3 days", "5 days", "7 days", "30 days"},
-            new int[]{0, 3, 5, 7, 30}, 7), lp(0));
-        root.addView(text("Gallery copies waiting for backup: at most", 13, C_TEXT, false), lp(8));
-        root.addView(prefSpinner("export_cap_gb", new String[]{"No cap", "5 GB", "10 GB", "20 GB", "50 GB"},
-            new int[]{0, 5, 10, 20, 50}, 10), lp(0));
+        galleryCard.addView(expAll, lp(2));
+        galleryCard.addView(text("Delete the gallery copy after", 13, C_TEXT, false), lp(12));
+        galleryCard.addView(prefSpinner("export_keep_days", new String[]{"Never", "3 days", "5 days", "7 days", "30 days"},
+            new int[]{0, 3, 5, 7, 30}, 7), lp(4));
+        galleryCard.addView(text("Gallery copies waiting for backup: at most", 13, C_TEXT, false), lp(10));
+        galleryCard.addView(prefSpinner("export_cap_gb", new String[]{"No cap", "5 GB", "10 GB", "20 GB", "50 GB"},
+            new int[]{0, 5, 10, 20, 50}, 10), lp(4));
         LinearLayout expRow = new LinearLayout(this);
         expRow.setOrientation(LinearLayout.HORIZONTAL);
         expRow.addView(button("Copy now", new View.OnClickListener() {
@@ -634,7 +739,7 @@ public class MainActivity extends Activity {
                     Toast.makeText(MainActivity.this, "Copy started", Toast.LENGTH_SHORT).show();
                 }
             }
-        }), new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        }), rowItem(true));
         expRow.addView(button("Test image", new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -657,40 +762,47 @@ public class MainActivity extends Activity {
                     }
                 }).start();
             }
-        }), new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-        root.addView(expRow, lp(6));
-        root.addView(button("Delete the gallery copies now", new View.OnClickListener() {
+        }), rowItem(false));
+        galleryCard.addView(expRow, lp(10));
+        galleryCard.addView(button("Delete the gallery copies now", new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 confirmPurge();
             }
-        }), lp(0));
+        }), lp(8));
         exportStatus = text("", 12, C_MUTED, false);
-        root.addView(exportStatus, lp(4));
+        galleryCard.addView(exportStatus, lp(6));
+        root.addView(galleryCard, lp(14));
 
-        root.addView(text("Backup on the phone", 16, C_TEXT, true), lp(26));
-        root.addView(text("Copies Immich's originals (the real files, not the thumbnails) to \"" + Backup.DIR
+        // ---- backup sul telefono ----
+        LinearLayout backupCard = card();
+        backupCard.addView(text("Backup on the phone", 16, C_TEXT, true));
+        backupCard.addView(text("Copies Immich's originals (the real files, not the thumbnails) to \"" + Backup.DIR
             + "\" in the phone's storage: a normal folder that any file manager shows, or a PC when the phone is "
             + "connected. In addition to the temporary gallery copy above (meant for Google Photos) and to the PC "
             + "copy described in the docs. Manual and incremental: you can stop it and start it again, it resumes "
-            + "where it stopped without copying everything again. It never deletes anything.", 12, C_MUTED, false), lp(4));
+            + "where it stopped without copying everything again. It never deletes anything.", 12, C_MUTED, false), lp(6));
         backupBtn = button("Copy to the phone now", new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 toggleBackup();
             }
         });
-        root.addView(backupBtn, lp(6));
+        backupCard.addView(backupBtn, lp(10));
         backupStatus = text("", 12, C_MUTED, false);
-        root.addView(backupStatus, lp(4));
+        backupCard.addView(backupStatus, lp(6));
+        root.addView(backupCard, lp(14));
 
-        root.addView(text("Battery", 16, C_TEXT, true), lp(26));
-        root.addView(text("A phone that is always plugged in sits at 100%, which over the years wears the battery more than "
+        // ---- batteria ----
+        LinearLayout batteryCard = card();
+        batteryCard.addView(text("Battery", 16, C_TEXT, true));
+        batteryCard.addView(text("A phone that is always plugged in sits at 100%, which over the years wears the battery more than "
             + "cycling between two thresholds. Android doesn't give a normal app (without root, and this one isn't) "
             + "control over charging: no app can switch the charger on or off by itself. What it can do is remind "
-            + "you, so you unplug and plug back in by hand.", 12, C_MUTED, false), lp(4));
+            + "you, so you unplug and plug back in by hand.", 12, C_MUTED, false), lp(6));
         CheckBox battGuard = new CheckBox(this);
         battGuard.setText("Remind me not to keep it charging at 100%");
+        battGuard.setButtonTintList(ColorStateList.valueOf(C_ACCENT));
         battGuard.setChecked(cfg.prefs.getBoolean("battery_guard_enabled", false));
         battGuard.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
@@ -698,29 +810,33 @@ public class MainActivity extends Activity {
                 cfg.prefs.edit().putBoolean("battery_guard_enabled", checked).apply();
             }
         });
-        root.addView(battGuard, lp(6));
-        root.addView(text("Remind me to unplug above", 13, C_TEXT, false), lp(8));
-        root.addView(prefSpinner("battery_guard_high", new String[]{"60%", "70%", "80%", "90%"},
-            new int[]{60, 70, 80, 90}, 80), lp(0));
-        root.addView(text("Remind me to plug back in below", 13, C_TEXT, false), lp(8));
-        root.addView(prefSpinner("battery_guard_low", new String[]{"20%", "30%", "40%", "50%"},
-            new int[]{20, 30, 40, 50}, 30), lp(0));
+        batteryCard.addView(battGuard, lp(10));
+        batteryCard.addView(text("Remind me to unplug above", 13, C_TEXT, false), lp(10));
+        batteryCard.addView(prefSpinner("battery_guard_high", new String[]{"60%", "70%", "80%", "90%"},
+            new int[]{60, 70, 80, 90}, 80), lp(4));
+        batteryCard.addView(text("Remind me to plug back in below", 13, C_TEXT, false), lp(10));
+        batteryCard.addView(prefSpinner("battery_guard_low", new String[]{"20%", "30%", "40%", "50%"},
+            new int[]{20, 30, 40, 50}, 30), lp(4));
         batteryStatus = text("", 12, C_MUTED, false);
-        root.addView(batteryStatus, lp(6));
+        batteryCard.addView(batteryStatus, lp(10));
+        root.addView(batteryCard, lp(14));
 
-        root.addView(text("Also delete the original from Immich", 14, C_TEXT, true), lp(20));
-        root.addView(text("Optional: some days after a photo reaches the gallery, deletes the original from Immich TOO, "
+        // ---- eliminare anche l'originale da Immich ----
+        LinearLayout pruneCard = card();
+        pruneCard.addView(text("Also delete the original from Immich", 14, C_TEXT, true));
+        pruneCard.addView(text("Optional: some days after a photo reaches the gallery, deletes the original from Immich TOO, "
             + "permanently (not to the trash). From then on no copy of the original is left on the phone: only the "
             + "one Google Photos uploaded (in \"Storage saver\" quality on Pixel 2–5, not the original). Use it only "
-            + "once you have checked that the Google Photos backup works.", 12, C_MUTED, false), lp(4));
-        root.addView(text("Immich API key (Account Settings → API Keys → New API Key, permission \"all\" or asset.delete)",
-            13, C_TEXT, false), lp(10));
+            + "once you have checked that the Google Photos backup works.", 12, C_MUTED, false), lp(6));
+        pruneCard.addView(text("Immich API key (Account Settings → API Keys → New API Key, permission \"all\" or asset.delete)",
+            13, C_TEXT, false), lp(12));
         apiKeyField = new EditText(this);
         apiKeyField.setHint("paste the key here");
         apiKeyField.setSingleLine(true);
         apiKeyField.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
         apiKeyField.setText(cfg.prefs.getString("prune_api_key", ""));
-        root.addView(apiKeyField, lp(4));
+        surface(apiKeyField);
+        pruneCard.addView(apiKeyField, lp(6));
         LinearLayout keyRow = new LinearLayout(this);
         keyRow.setOrientation(LinearLayout.HORIZONTAL);
         keyRow.addView(button("Save the key", new View.OnClickListener() {
@@ -729,7 +845,7 @@ public class MainActivity extends Activity {
                 cfg.prefs.edit().putString("prune_api_key", apiKeyField.getText().toString().trim()).apply();
                 Toast.makeText(MainActivity.this, "Saved", Toast.LENGTH_SHORT).show();
             }
-        }), new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        }), rowItem(true));
         keyRow.addView(button("Test the key", new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -747,24 +863,28 @@ public class MainActivity extends Activity {
                     }
                 }).start();
             }
-        }), new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-        root.addView(keyRow, lp(4));
-        root.addView(text("Delete the original from Immich after", 13, C_TEXT, false), lp(10));
-        root.addView(prefSpinner("prune_days", new String[]{"Never (default)", "2 days", "3 days", "5 days", "7 days"},
-            new int[]{0, 2, 3, 5, 7}, 0), lp(0));
+        }), rowItem(false));
+        pruneCard.addView(keyRow, lp(8));
+        pruneCard.addView(text("Delete the original from Immich after", 13, C_TEXT, false), lp(10));
+        pruneCard.addView(prefSpinner("prune_days", new String[]{"Never (default)", "2 days", "3 days", "5 days", "7 days"},
+            new int[]{0, 2, 3, 5, 7}, 0), lp(4));
         pruneStatus = text("", 12, C_MUTED, false);
-        root.addView(pruneStatus, lp(6));
+        pruneCard.addView(pruneStatus, lp(10));
+        root.addView(pruneCard, lp(14));
 
-        root.addView(text("Originals directly in DCIM/Immich", 14, C_TEXT, true), lp(20));
-        root.addView(text("Instead of the app's private folder, Immich keeps the originals in DCIM/Immich/<user> (\"admin\" for "
+        // ---- originali in DCIM/Immich + pulizia delle foto senza file ----
+        LinearLayout dcimCard = card();
+        dcimCard.addView(text("Originals directly in DCIM/Immich", 14, C_TEXT, true));
+        dcimCard.addView(text("Instead of the app's private folder, Immich keeps the originals in DCIM/Immich/<user> (\"admin\" for "
             + "the administrator) with their real names: Gallery and Google Photos see them right away, with no "
             + "temporary copies. In Google Photos turn on the backup of the \"admin\" folder once (Settings → Backup → "
             + "Back up device folders). Careful: other apps can delete them from there too, for example Google "
             + "Photos' \"Free up space\" after its backup; Immich then keeps the photo without its original (see the "
             + "cleanup below). Thumbnails, transcoded videos and the database stay private. Turning it on restarts the "
-            + "server and moves the photos already uploaded (a few minutes); it needs the Storage permission.", 12, C_MUTED, false), lp(4));
+            + "server and moves the photos already uploaded (a few minutes); it needs the Storage permission.", 12, C_MUTED, false), lp(6));
         dcimBox = new CheckBox(this);
         dcimBox.setText("Keep the originals in DCIM/Immich");
+        dcimBox.setButtonTintList(ColorStateList.valueOf(C_ACCENT));
         dcimBox.setChecked(cfg.dcimWanted());
         dcimBox.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
@@ -772,12 +892,14 @@ public class MainActivity extends Activity {
                 onDcimSwitch(checked);
             }
         });
-        root.addView(dcimBox, lp(6));
+        dcimCard.addView(dcimBox, lp(10));
         dcimStatus = text("", 12, C_MUTED, false);
-        root.addView(dcimStatus, lp(4));
+        dcimCard.addView(dcimStatus, lp(6));
 
+        dcimCard.addView(text("Cleaning up photos whose file is gone", 14, C_TEXT, true), lp(22));
         CheckBox missing = new CheckBox(this);
         missing.setText("Every night move to Immich's trash the photos whose file is gone");
+        missing.setButtonTintList(ColorStateList.valueOf(C_ACCENT));
         missing.setChecked(cfg.prefs.getBoolean("missing_cleanup", false));
         missing.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
@@ -785,11 +907,11 @@ public class MainActivity extends Activity {
                 cfg.prefs.edit().putBoolean("missing_cleanup", checked).apply();
             }
         });
-        root.addView(missing, lp(8));
-        root.addView(text("Uses Immich's nightly check (at 3:00: Administration → Maintenance → Integrity Report → Missing Files) "
+        dcimCard.addView(missing, lp(10));
+        dcimCard.addView(text("Uses Immich's nightly check (at 3:00: Administration → Maintenance → Integrity Report → Missing Files) "
             + "and the API key above; they can be restored from Immich's trash for 30 days. It does nothing if too many "
-            + "are missing at once or if the folders are not readable.", 12, C_MUTED, false), lp(2));
-        root.addView(button("Check now", new View.OnClickListener() {
+            + "are missing at once or if the folders are not readable.", 12, C_MUTED, false), lp(4));
+        dcimCard.addView(button("Check now", new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 new Thread(new Runnable() {
@@ -805,13 +927,17 @@ public class MainActivity extends Activity {
                     }
                 }, "immich-missing").start();
             }
-        }), lp(4));
+        }), lp(8));
         missingStatus = text("", 12, C_MUTED, false);
-        root.addView(missingStatus, lp(4));
+        dcimCard.addView(missingStatus, lp(6));
+        root.addView(dcimCard, lp(14));
 
-        root.addView(text("Advanced", 16, C_TEXT, true), lp(24));
+        // ---- avanzate ----
+        LinearLayout advCard = card();
+        advCard.addView(text("Advanced", 16, C_TEXT, true));
         CheckBox noSec = new CheckBox(this);
         noSec.setText("proot without seccomp (only if the server hangs on start)");
+        noSec.setButtonTintList(ColorStateList.valueOf(C_ACCENT));
         noSec.setChecked(cfg.noSeccomp());
         noSec.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
@@ -819,15 +945,18 @@ public class MainActivity extends Activity {
                 cfg.setNoSeccomp(checked);
             }
         });
-        root.addView(noSec, lp(4));
-        root.addView(button("Repair: reinstall the Debian system (data and photos stay)", new View.OnClickListener() {
+        advCard.addView(noSec, lp(10));
+        advCard.addView(button("Repair: reinstall the Debian system (data and photos stay)", new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 confirmRepair();
             }
-        }), lp(4));
+        }), lp(10));
+        root.addView(advCard, lp(14));
 
-        root.addView(text("Logs and diagnostics", 16, C_TEXT, true), lp(24));
+        // ---- log e diagnostica ----
+        LinearLayout logsCard = card();
+        logsCard.addView(text("Logs and diagnostics", 16, C_TEXT, true));
         LinearLayout row2 = new LinearLayout(this);
         row2.setOrientation(LinearLayout.HORIZONTAL);
         row2.setGravity(Gravity.CENTER_VERTICAL);
@@ -845,21 +974,26 @@ public class MainActivity extends Activity {
             public void onNothingSelected(AdapterView<?> p) {
             }
         });
-        row2.addView(source, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        surface(source);
+        row2.addView(source, rowItem(true));
+        LinearLayout.LayoutParams diagBtnLp = new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        diagBtnLp.leftMargin = dp(10);
         row2.addView(button("Run diagnostics", new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 runDiagnosis();
             }
-        }));
-        root.addView(row2, lp(6));
+        }), diagBtnLp);
+        logsCard.addView(row2, lp(12));
 
         logView = text("", 11, Color.parseColor("#222222"), false);
         logView.setTypeface(Typeface.MONOSPACE);
-        logView.setBackgroundColor(Color.parseColor("#E9ECF3"));
-        logView.setPadding(dp(8), dp(8), dp(8), dp(8));
+        logView.setBackground(shape(C_SURFACE, 10));
+        logView.setPadding(dp(10), dp(10), dp(10), dp(10));
         logView.setTextIsSelectable(true);
-        root.addView(logView, lp(8));
+        logsCard.addView(logView, lp(10));
+        root.addView(logsCard, lp(14));
 
         root.addView(text("Next steps: when the status reads \"Running\", open the address above in a browser or in the Immich "
             + "app and create the admin user. Machine learning is turned off automatically: it is too heavy for this "
@@ -901,17 +1035,24 @@ public class MainActivity extends Activity {
                 break;
         }
         status.setText(label);
-        status.setTextColor(color);
+        if (!statusColorShown || color != shownStatusColor) {
+            if (statusColorShown) animateColor(status, shownStatusColor, color); else status.setTextColor(color);
+            shownStatusColor = color;
+            statusColorShown = true;
+        }
         detail.setText(s == Stack.State.IDLE && !installed ? "Press the button to install (needs Internet)." : Stack.I.detail());
 
         int pct = Stack.I.progress();
         bar.setVisibility(pct >= 0 ? View.VISIBLE : View.GONE);
-        bar.setProgress(Math.max(0, pct));
+        int shownPct = Math.max(0, pct);
+        if (shownPct != bar.getProgress()) {
+            ObjectAnimator.ofInt(bar, "progress", bar.getProgress(), shownPct).setDuration(300).start();
+        }
 
         boolean idle = s == Stack.State.IDLE || s == Stack.State.ERROR;
         mainBtn.setText(idle ? (installed ? "Start the server" : "Install and start") : "Stop the server");
-        mainBtn.setEnabled(s != Stack.State.STOPPING);
-        openBtn.setEnabled(s == Stack.State.RUNNING);
+        setEnabledLook(mainBtn, s != Stack.State.STOPPING);
+        setEnabledLook(openBtn, s == Stack.State.RUNNING);
 
         StringBuilder u = new StringBuilder();
         List<String> ips = Util.ipv4();
@@ -936,7 +1077,7 @@ public class MainActivity extends Activity {
         updateStatus.setText("Installed: Immich " + (installedVersion.isEmpty() ? "(not yet)" : installedVersion)
             + (us.isEmpty() ? "" : "\n" + us));
         Updater.Release up = Updater.available();
-        updateBtn.setEnabled(up != null && !Updater.busy());
+        setEnabledLook(updateBtn, up != null && !Updater.busy());
         updateBtn.setText(Updater.busy() ? "Downloading…" : up == null ? "Update" : up.rebuild ? "Install the new build"
             : "Update to " + up.tag);
         Intent confirm = Updater.takeConfirm();
