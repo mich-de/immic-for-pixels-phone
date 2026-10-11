@@ -122,6 +122,25 @@ final class Cfg {
         prefs.edit().putBoolean("should_run", v).apply();
     }
 
+    /**
+     * "pixel" (ponte verso Google Foto) o "private" (server privato): solo per mostrare quale preset è attivo e per
+     * farlo scegliere di nuovo dall'utente (vedi MainActivity.applyPreset). La prima volta lo deduce da
+     * dcim_originals, così un'installazione già esistente (es. il Pixel 5 dell'utente) non cambia comportamento:
+     * la deduzione non tocca prune_emergency né altro.
+     */
+    String setupMode() {
+        String m = prefs.getString("setup_mode", null);
+        if (m == null) {
+            m = dcimWanted() ? "pixel" : "private";
+            prefs.edit().putString("setup_mode", m).apply();
+        }
+        return m;
+    }
+
+    void setSetupMode(String m) {
+        prefs.edit().putString("setup_mode", m).apply();
+    }
+
     boolean noSeccomp() {
         return prefs.getBoolean("proot_no_seccomp", false);
     }

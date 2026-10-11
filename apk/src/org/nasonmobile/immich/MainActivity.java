@@ -74,6 +74,11 @@ public class MainActivity extends Activity {
     private TextView updateStatus;
     private Button updateBtn;
     private String installedVersion = "";
+    private Button presetPixelBtn;
+    private Button presetPrivateBtn;
+    private TextView presetCaption;
+    private CheckBox pruneEmergencyBox;
+    private TextView pruneEmergencyNote;
     private CheckBox dcimBox;
     private EditText apiKeyField;
     private TextView logView;
@@ -444,20 +449,35 @@ public class MainActivity extends Activity {
         return c;
     }
 
+    /**
+     * Colore di testo e sfondo di un bottone: tenue ("tonale", l'azione normale dentro una card) o pieno
+     * ("primario", la singola azione più importante di una card, o quale preset è attivo nel selettore in alto).
+     * Estratto da button()/primaryButton() così il selettore dei preset può ridipingere un bottone già creato
+     * senza ricrearlo.
+     */
+    private void setButtonLook(Button b, boolean primary) {
+        if (primary) {
+            b.setTextColor(Color.WHITE);
+            b.setBackground(ripple(C_ACCENT, 12, Color.argb(90, 255, 255, 255)));
+        } else {
+            b.setTextColor(C_ACCENT);
+            int tint = Color.argb(28, Color.red(C_ACCENT), Color.green(C_ACCENT), Color.blue(C_ACCENT));
+            b.setBackground(ripple(tint, 12, Color.argb(45, 0, 0, 0)));
+        }
+    }
+
     /** bottone "tonale" (sfondo tenue, testo colorato): l'azione normale dentro una card */
     private Button button(String label, View.OnClickListener l) {
         Button b = new Button(this);
         b.setText(label);
         b.setAllCaps(false);
         b.setTypeface(Typeface.DEFAULT_BOLD);
-        b.setTextColor(C_ACCENT);
         b.setPadding(dp(16), dp(11), dp(16), dp(11));
         b.setMinimumWidth(0);
         b.setMinimumHeight(0);
         b.setStateListAnimator(null);
         b.setElevation(0);
-        int tint = Color.argb(28, Color.red(C_ACCENT), Color.green(C_ACCENT), Color.blue(C_ACCENT));
-        b.setBackground(ripple(tint, 12, Color.argb(45, 0, 0, 0)));
+        setButtonLook(b, false);
         b.setOnClickListener(l);
         return b;
     }
@@ -465,8 +485,7 @@ public class MainActivity extends Activity {
     /** bottone "pieno": la singola azione più importante di una card (avvia il server, installa l'aggiornamento) */
     private Button primaryButton(String label, View.OnClickListener l) {
         Button b = button(label, l);
-        b.setTextColor(Color.WHITE);
-        b.setBackground(ripple(C_ACCENT, 12, Color.argb(90, 255, 255, 255)));
+        setButtonLook(b, true);
         return b;
     }
 
@@ -565,6 +584,51 @@ public class MainActivity extends Activity {
             .show();
     }
 
+    /**
+     * Mostra sempre la conferma, anche se "mode" sembra già attivo: su un'installazione già esistente (il Pixel 5
+     * dell'utente) il preset è dedotto da dcim_originals (vedi Cfg.setupMode()) ma prune_emergency non è mai stato
+     * acceso da quella deduzione — toccare di nuovo lo stesso bottone resta il modo per far entrare anche quello.
+     */
+    private void confirmPreset(final String mode) {
+        boolean pixel = "pixel".equals(mode);
+        String title = pixel ? "Pixel → Google Photos bridge" : "Private photo server";
+        String msg = pixel
+            ? "Turns on Keep the originals in DCIM/Immich (restarts the server and moves photos already uploaded) and "
+                + "the emergency deletion safety net below. \"Delete the original from Immich after\" is left as it is."
+            : "Turns off Keep the originals in DCIM/Immich (new photos stop moving to DCIM/Immich; ones already there "
+                + "stay where they are) and the emergency deletion safety net below. \"Delete the original from Immich "
+                + "after\" is left as it is.";
+        new AlertDialog.Builder(this)
+            .setTitle(title)
+            .setMessage(msg)
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton("Apply", new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface d, int w) {
+                    applyPreset(mode);
+                }
+            })
+            .show();
+    }
+
+    private void applyPreset(String mode) {
+        boolean pixel = "pixel".equals(mode);
+        cfg.setSetupMode(mode);
+        dcimBox.setChecked(pixel);           // listener esistente onDcimSwitch(): permesso, migrazione, riavvio
+        pruneEmergencyBox.setChecked(pixel); // listener nuovo: scrive solo la preferenza prune_emergency
+        refresh();
+    }
+
+    private void refreshPreset() {
+        String mode = cfg.setupMode();
+        boolean pixel = "pixel".equals(mode);
+        setButtonLook(presetPixelBtn, pixel);
+        setButtonLook(presetPrivateBtn, !pixel);
+        presetCaption.setText(pixel
+            ? "Active: Pixel → Google Photos bridge — originals move to DCIM/Immich for Google Photos' free backup."
+            : "Active: Private photo server — originals stay in the app's private storage, nothing is shared.");
+    }
+
     private View buildUi() {
         ScrollView sv = new ScrollView(this);
         sv.setBackgroundColor(C_BG);
@@ -575,6 +639,27 @@ public class MainActivity extends Activity {
 
         root.addView(text("Immich Server", 24, C_TEXT, true));
         root.addView(text("Your photo and video server, on this phone", 14, C_MUTED, false), lp(2));
+
+        // ---- cosa fa questo telefono: un preset che precompila le impostazioni sotto, nessuna le nasconde ----
+        LinearLayout presetRow = new LinearLayout(this);
+        presetRow.setOrientation(LinearLayout.HORIZONTAL);
+        presetPixelBtn = button("Pixel bridge", new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                confirmPreset("pixel");
+            }
+        });
+        presetPrivateBtn = button("Private server", new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                confirmPreset("private");
+            }
+        });
+        presetRow.addView(presetPixelBtn, rowItem(true));
+        presetRow.addView(presetPrivateBtn, rowItem(false));
+        root.addView(presetRow, lp(14));
+        presetCaption = text("", 12, C_MUTED, false);
+        root.addView(presetCaption, lp(4));
 
         // ---- card principale: stato, avanzamento, indirizzo, avvio/arresto ----
         LinearLayout hero = card();
@@ -868,8 +953,25 @@ public class MainActivity extends Activity {
         pruneCard.addView(text("Delete the original from Immich after", 13, C_TEXT, false), lp(10));
         pruneCard.addView(prefSpinner("prune_days", new String[]{"Never (default)", "2 days", "3 days", "5 days", "7 days"},
             new int[]{0, 2, 3, 5, 7}, 0), lp(4));
+        pruneEmergencyBox = new CheckBox(this);
+        pruneEmergencyBox.setText("Emergency: also delete originals when space is critical, even if set to \"Never\"");
+        pruneEmergencyBox.setButtonTintList(ColorStateList.valueOf(C_ACCENT));
+        pruneEmergencyBox.setChecked(cfg.prefs.getBoolean("prune_emergency", false));
+        pruneEmergencyBox.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton b, boolean checked) {
+                cfg.prefs.edit().putBoolean("prune_emergency", checked).apply();
+            }
+        });
+        pruneCard.addView(pruneEmergencyBox, lp(14));
+        pruneCard.addView(text("Only as a last resort: only originals already safely copied to the gallery, oldest "
+            + "first, a limited number per run so a large backlog doesn't disappear all at once, and only below the "
+            + "critical threshold above (not just \"running low\"). A notification tells you the first time it "
+            + "actually deletes something.", 12, C_MUTED, false), lp(2));
         pruneStatus = text("", 12, C_MUTED, false);
         pruneCard.addView(pruneStatus, lp(10));
+        pruneEmergencyNote = text("", 12, C_WARN, true);
+        pruneCard.addView(pruneEmergencyNote, lp(4));
         root.addView(pruneCard, lp(14));
 
         // ---- originali in DCIM/Immich + pulizia delle foto senza file ----
@@ -1004,6 +1106,7 @@ public class MainActivity extends Activity {
     // ------------------------------------------------------------------ aggiornamento
 
     private void refresh() {
+        refreshPreset();
         Stack.State s = Stack.I.state();
         boolean installed = Stack.installed(cfg);
         String label;
@@ -1069,6 +1172,10 @@ public class MainActivity extends Activity {
 
         exportStatus.setText(Exporter.status() + "\n" + Exporter.stagedInfo(cfg));
         pruneStatus.setText(Pruner.status());
+        String shrinkNote = Pruner.effectiveDaysNote(cfg);
+        pruneEmergencyNote.setText(shrinkNote);
+        pruneEmergencyNote.setVisibility(shrinkNote.isEmpty() ? View.GONE : View.VISIBLE);
+        pruneEmergencyNote.setTextColor(spaceLvl == 1 ? C_ERR : C_WARN);
         dcimStatus.setText(DcimMode.status(cfg));
         missingStatus.setText(MissingCleaner.status(cfg));
 

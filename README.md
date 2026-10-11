@@ -27,7 +27,8 @@ Google Photos gives these phones free, unlimited backup of the photos and videos
 
 So the Pixel keeps your originals at full quality in Immich, for the whole family, and passes every photo on to Google
 Photos for free. The app also works on **any arm64 Android phone** as a plain Immich server, just without the free
-Google Photos backup.
+Google Photos backup: pick **Private server** at the top of the app's screen (instead of **Pixel bridge**) and skip
+step 6 below.
 
 ## Install
 

@@ -1,5 +1,11 @@
 package org.nasonmobile.immich;
 
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
+import android.content.Context;
+import android.content.Intent;
 import android.util.Log;
 
 import org.json.JSONArray;
@@ -37,12 +43,51 @@ import java.util.Set;
  */
 final class Pruner {
     private static volatile String status = "";
+    /** cutoff usato quando "Mai" (0) + l'interruttore d'emergenza + spazio critico: 1 giorno, non "subito" */
+    private static final int EMERGENCY_DAYS = 1;
+    /** quante risorse "Mai" può toccare in UN giro: non svuota mesi di arretrato alla prima vera emergenza */
+    private static final int EMERGENCY_CAP = 200;
+    private static final String CHANNEL = "prune_emergency";
+    private static final int NID = 4; // ServerService=1, BatteryGuard=2, Updater=3
 
     private Pruner() {
     }
 
     static String status() {
         return status.isEmpty() ? "Off." : status;
+    }
+
+    /**
+     * Quanti giorni usare davvero, in base allo spazio libero: non supera mai quello scelto dall'utente, scende
+     * solo se lo spazio peggiora, e a "Mai" (0) resta un no-op a meno che l'interruttore d'emergenza sia acceso E
+     * lo spazio sia davvero critico (non solo "in esaurimento"). Pura logica, provabile sul PC senza File reali:
+     * spaceLevel è quello di Health.spaceLevel (-1 ok, 0 in esaurimento, 1 critico).
+     */
+    static int effectiveDaysFromLevel(int userDays, int spaceLevel, boolean emergencyOn) {
+        if (userDays > 0) {
+            if (spaceLevel == 1) return 1;
+            if (spaceLevel == 0) return Math.max(1, userDays / 2);
+            return userDays;
+        }
+        return (spaceLevel == 1 && emergencyOn) ? EMERGENCY_DAYS : 0;
+    }
+
+    static int effectiveDays(Cfg c) {
+        return effectiveDaysFromLevel(c.prefs.getInt("prune_days", 0), Health.spaceLevel(c.files),
+            c.prefs.getBoolean("prune_emergency", false));
+    }
+
+    /** "" se il taglio non è ridotto rispetto a quello scelto (o la funzione è spenta): altrimenti lo spiega */
+    static String effectiveDaysNote(Cfg c) {
+        int userDays = c.prefs.getInt("prune_days", 0);
+        if (c.prefs.getString("prune_api_key", "").isEmpty()) return "";
+        int days = effectiveDays(c);
+        if (days == userDays) return "";
+        String lvl = Health.spaceLevel(c.files) == 1 ? "critically low" : "running low";
+        return userDays == 0
+            ? "Storage is " + lvl + ": emergency deletion is active even though you set \"Never\" (" + days + " day"
+                + (days == 1 ? "" : "s") + ")."
+            : "Storage is " + lvl + ": shrunk from " + userDays + " to " + days + " day" + (days == 1 ? "" : "s") + ".";
     }
 
     private static File exportedFile(Cfg c) {
@@ -90,7 +135,10 @@ final class Pruner {
     }
 
     private static void doRun(Cfg c) throws Exception {
-        int days = c.prefs.getInt("prune_days", 0);
+        int userDays = c.prefs.getInt("prune_days", 0);
+        int days = effectiveDays(c);
+        boolean emergency = userDays <= 0 && days > 0; // "Mai" ma l'emergenza l'ha acceso per questo giro
+        if (!emergency) clearEmergencyNotified(c); // fuori dall'emergenza: un prossimo episodio avviserà di nuovo
         String apiKey = c.prefs.getString("prune_api_key", "");
         if (days <= 0 || apiKey.isEmpty()) return; // spento
 
@@ -116,6 +164,8 @@ final class Pruner {
             status = "Nothing to delete from Immich for now.";
             return;
         }
+        // emergenza = stavano protette da "Mai": non si svuota tutto l'arretrato al primo giro, solo le più vecchie
+        if (emergency && due.size() > EMERGENCY_CAP) due = due.subList(0, EMERGENCY_CAP);
 
         int ok = 0;
         for (int i = 0; i < due.size(); i += 50) { // a lotti, come consiglia l'API
@@ -130,6 +180,37 @@ final class Pruner {
             ok += batch.size();
         }
         status = "Permanently deleted " + ok + " assets from Immich (copied at least " + days + " days ago).";
+        if (emergency && ok > 0 && !c.prefs.getBoolean("prune_emergency_notified", false)) {
+            notifyEmergency(c, ok);
+            c.prefs.edit().putBoolean("prune_emergency_notified", true).apply();
+        }
+    }
+
+    private static void clearEmergencyNotified(Cfg c) {
+        if (c.prefs.getBoolean("prune_emergency_notified", false)) {
+            c.prefs.edit().putBoolean("prune_emergency_notified", false).apply();
+        }
+    }
+
+    private static void notifyEmergency(Cfg c, int count) {
+        NotificationManager nm = (NotificationManager) c.ctx.getSystemService(Context.NOTIFICATION_SERVICE);
+        nm.createNotificationChannel(new NotificationChannel(CHANNEL, "Emergency cleanup", NotificationManager.IMPORTANCE_DEFAULT));
+        PendingIntent open = PendingIntent.getActivity(c.ctx, NID, new Intent(c.ctx, MainActivity.class),
+            PendingIntent.FLAG_UPDATE_CURRENT);
+        int small = c.ctx.getResources().getIdentifier("ic_stat", "drawable", c.ctx.getPackageName());
+        Notification n = new Notification.Builder(c.ctx, CHANNEL)
+            .setContentTitle("Freed space: deleted " + count + " originals from Immich")
+            .setContentText("Storage was critically low. Only originals already safely in the gallery were deleted, "
+                + "permanently, even though you had set \"Never\". Turn it off in the app if you don't want this.")
+            .setStyle(new Notification.BigTextStyle().bigText("Storage was critically low, so the emergency cleanup you "
+                + "turned on deleted " + count + " originals from Immich, permanently. It only ever touches originals "
+                + "already safely copied to the gallery, oldest first. Turn off \"Emergency: also delete originals...\" "
+                + "in the app if you don't want this to happen again."))
+            .setSmallIcon(small != 0 ? small : c.ctx.getApplicationInfo().icon)
+            .setContentIntent(open)
+            .setAutoCancel(true)
+            .build();
+        nm.notify(NID, n);
     }
 
     private static void appendPruned(Cfg c, List<String> ids) throws IOException {

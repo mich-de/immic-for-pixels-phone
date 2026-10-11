@@ -2,6 +2,7 @@
 
 Every option of the app, with its caveats. Back to the [README](../README.md).
 
+- [Configurations](#configurations)
 - [Where the photos are](#where-the-photos-are)
 - [Getting the photos into Google Photos](#getting-the-photos-into-google-photos)
   - [Originals in DCIM/Immich](#originals-in-dcimimmich) (recommended)
@@ -13,6 +14,22 @@ Every option of the app, with its caveats. Back to the [README](../README.md).
 - [Storage warnings](#storage-warnings)
 - [Updates](#updates)
 - [Advanced](#advanced)
+
+## Configurations
+
+Two buttons at the top of the app's screen apply a bundle of sensible defaults; every toggle they touch stays visible
+below and can still be changed by hand afterwards — picking a preset never hides anything.
+
+| | Pixel → Google Photos bridge | Private photo server |
+|---|---|---|
+| [Originals in DCIM/Immich](#originals-in-dcimimmich) | on | off (private storage) |
+| [Emergency deletion](#deleting-the-original-from-immich) when space is critical | on | off |
+| Typical use | this phone also feeds Google Photos | this phone is only an Immich server |
+
+Switching presets asks for confirmation first (it restarts the server when it touches **Originals in DCIM/Immich**).
+If you're updating from before this feature existed, nothing changes by itself: the preset shown as active is inferred
+once from whatever **Originals in DCIM/Immich** was already set to, and the new emergency toggle stays off until you
+turn it on yourself.
 
 ## Where the photos are
 
@@ -107,6 +124,18 @@ the one in Google Photos, in Storage saver quality on Pixel 2–5.
 It only deletes photos that reached the gallery successfully, and it goes through Immich's API, so Immich itself
 removes thumbnails and files.
 
+**Adaptive, when space is tight.** The number of days you choose above is a ceiling, not a fixed schedule: the app
+shrinks it automatically as free space drops (see [Storage warnings](#storage-warnings) for the thresholds), and the
+status line under the switch says so whenever a shrink is currently in effect.
+
+**Emergency deletion ("Never" + critical space).** Tick **Emergency: also delete originals when space is critical,
+even if set to "Never"** to let the app delete originals as a true last resort when free space is critically low —
+not just "running low" — even if you left the setting above at Never. It only ever touches originals already
+confirmed safe in the gallery, oldest first, a limited number per run (so a months-old backlog doesn't disappear all
+at once the first time it ever fires), and it sends a notification the first time it actually deletes something. This
+is what the **Pixel → Google Photos bridge** preset turns on by default — see [Configurations](#configurations) — for
+phones with less storage than the Pixel 5 this app was first tested on.
+
 > **If the photos come from another phone with the Immich app** (your main phone, typically), free that phone first.
 > The Immich app uploads every photo it doesn't find on the server: once the original is deleted from Immich, a photo
 > still on that phone is **uploaded again**, and the cycle repeats. On that phone use the Immich app's own
@@ -148,7 +177,8 @@ has one. Keep the phone somewhere cool: thumbnails and video transcoding heat it
 Below 2 GB free, the app shows the free space in yellow and the server notification says *storage running low*; below
 500 MB it turns red (*STORAGE ALMOST FULL*): PostgreSQL and the copies may stall. To free space on the server, in
 Immich use *Utilities → Review large files*, then *Empty trash* (deleted photos only free space once the trash is
-emptied, or after 30 days).
+emptied, or after 30 days). These same two thresholds also drive the adaptive and emergency deletion described under
+[Deleting the original from Immich](#deleting-the-original-from-immich).
 
 ## Updates
 
