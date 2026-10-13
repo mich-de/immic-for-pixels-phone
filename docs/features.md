@@ -20,16 +20,27 @@ Every option of the app, with its caveats. Back to the [README](../README.md).
 Two buttons at the top of the app's screen apply a bundle of sensible defaults; every toggle they touch stays visible
 below and can still be changed by hand afterwards — picking a preset never hides anything.
 
-| | Pixel → Google Photos bridge | Private photo server |
+| | Pixel → Google Photos bridge (default) | Private photo server |
 |---|---|---|
 | [Originals in DCIM/Immich](#originals-in-dcimimmich) | on | off (private storage) |
 | [Emergency deletion](#deleting-the-original-from-immich) when space is critical | on | off |
 | Typical use | this phone also feeds Google Photos | this phone is only an Immich server |
 
-Switching presets asks for confirmation first (it restarts the server when it touches **Originals in DCIM/Immich**).
-If you're updating from before this feature existed, nothing changes by itself: the preset shown as active is inferred
-once from whatever **Originals in DCIM/Immich** was already set to, and the new emergency toggle stays off until you
-turn it on yourself.
+**Pixel → Google Photos bridge is what a new install starts with** — it's what this project is for, and the app asks
+for the *Storage* permission the first time you open it so it's usually ready before you even press *Install and
+start*. Pick **Private photo server** instead if you'd rather keep everything on this phone only; if you still want a
+plain, easy-to-reach copy of your photos (for a file manager or a PC over USB) without sharing anything automatically,
+turn on [Backup on the phone](#backup-on-the-phone) — it works in either configuration and never shares anything by
+itself.
+
+**Switching later asks for confirmation first**, and says plainly what changes (it restarts the server when it
+touches **Originals in DCIM/Immich**). One thing to know either way: switching from the bridge back to private does
+**not** retroactively hide photos already moved into `DCIM/Immich` — they stay visible to Google Photos and other
+apps until you move or delete them yourself; only *new* photos stop going there.
+
+If you're updating from before this feature existed, nothing changes by itself: the preset shown as active is
+inferred once from whatever **Originals in DCIM/Immich** was already set to, and the new emergency toggle stays off
+until you turn it on yourself.
 
 ## Where the photos are
 

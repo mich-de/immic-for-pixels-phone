@@ -28,7 +28,8 @@ Google Foto dà a questi telefoni il backup gratuito e illimitato delle foto e d
 
 Così il Pixel tiene i tuoi originali a piena qualità in Immich, per tutta la famiglia, e passa ogni foto a Google Foto
 gratis. L'app funziona anche su **qualunque telefono Android arm64** come semplice server Immich, solo senza il backup
-gratuito di Google Foto.
+gratuito di Google Foto: scegli **Private server** in cima alla schermata dell'app (invece di **Pixel bridge**) e
+salta il passo 6 qui sotto.
 
 ## Installazione
 
@@ -53,7 +54,9 @@ Serve il telefono che farà da server (arm64, Android 8+, qualche GB libero), il
 5. **Collega i tuoi telefoni.** Installa l'app ufficiale **Immich** sugli altri telefoni, inserisci lo stesso indirizzo
    come *URL del server*, accedi e attiva il backup.
 6. **Manda tutto su Google Foto** (Pixel 1–5). Sul telefono server:
-   - nell'app attiva **Keep the originals in DCIM/Immich** (chiede il permesso *Memoria* e riavvia il server);
+   - **Keep the originals in DCIM/Immich** è già attivo (il preset **Pixel bridge** in cima alla schermata è quello di
+     serie): se avevi negato il permesso *Memoria* alla prima apertura dell'app, tocca di nuovo **Pixel bridge** in
+     cima, oppure concedilo da *Impostazioni → App → Immich Server → Autorizzazioni* e riavvia il server;
    - in Google Foto attiva il *Backup*; sui Pixel 2–5 tieni la *Qualità del backup* su **Risparmio spazio** (la qualità
      originale userebbe lo spazio del tuo account Google);
    - in Google Foto, *Impostazioni → Backup → Cartelle del dispositivo* → attiva **admin**.

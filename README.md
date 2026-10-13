@@ -53,8 +53,9 @@ You need the phone that will be the server (arm64, Android 8+, a few GB free), y
 5. **Connect your phones.** Install the official **Immich** app on your other phones, enter the same address as
    *Server URL*, log in and turn on backup.
 6. **Send everything to Google Photos** (Pixel 1–5). On the server phone:
-   - in the app, turn on **Keep the originals in DCIM/Immich** (it asks for the *Storage* permission and restarts the
-     server);
+   - **Keep the originals in DCIM/Immich** is already on (the **Pixel bridge** preset at the top of the screen is the
+     default): if you denied the *Storage* permission when you first opened the app, tap **Pixel bridge** again at
+     the top, or grant it in *Settings → Apps → Immich Server → Permissions* and restart the server;
    - in Google Photos, turn on *Backup*; on Pixel 2–5 keep *Backup quality* on **Storage saver** (Original quality
      would use your Google storage);
    - in Google Photos, *Settings → Backup → Back up device folders* → turn on **admin**.

@@ -53,6 +53,7 @@ public class MainActivity extends Activity {
     private static final int C_SURFACE = Color.parseColor("#F1F3F9"); // campi/spinner/log dentro una card
     private static final int REQ_STORAGE = 100;
     private static final int REQ_STORAGE_DCIM = 101;
+    private static final int REQ_STORAGE_DEFAULT = 102;
 
     /** in primo piano: la finestra di conferma di un aggiornamento si può aprire subito (vedi Updater.onStatus) */
     static volatile boolean resumed;
@@ -105,6 +106,7 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle b) {
         super.onCreate(b);
         cfg = new Cfg(this);
+        maybeDefaultToPixelBridge();
         setContentView(buildUi());
         // ricreata (rotazione, ritorno dopo che Android l'ha chiusa): i comandi dell'intent sono già stati eseguiti
         if (b == null) handleIntent(getIntent());
@@ -318,6 +320,17 @@ public class MainActivity extends Activity {
             } else {
                 dcimBox.setChecked(false);
                 Toast.makeText(this, "The Storage permission is needed to keep the originals in DCIM", Toast.LENGTH_LONG).show();
+            }
+        } else if (requestCode == REQ_STORAGE_DEFAULT) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                applyDcim(true);
+            } else {
+                // dcimWanted() già a false, così il listener di dcimBox non fa nulla: un solo avviso, non due
+                DcimMode.onSwitch(cfg, false);
+                cfg.setSetupMode("private");
+                dcimBox.setChecked(false);
+                Toast.makeText(this, "Keeping photos private on this phone. Turn on \"Pixel bridge\" at the top anytime "
+                    + "if you change your mind.", Toast.LENGTH_LONG).show();
             }
         }
     }
@@ -585,6 +598,23 @@ public class MainActivity extends Activity {
     }
 
     /**
+     * La primissima volta che l'app viene aperta (mai stato configurato nulla: niente db_password, che Cfg crea solo
+     * quando il server viene preparato almeno una volta) parte già come "Pixel bridge", lo scopo per cui esiste
+     * l'app: chiede subito il permesso Memoria, così di solito è già pronto quando si preme "Install and start". Su
+     * un'installazione che esisteva già prima di questa funzione (setup_mode non ancora scelto ma db_password già
+     * presente) non si tocca nulla: resta quello che Cfg.setupMode() deduce da dcim_originals, come sempre.
+     */
+    private void maybeDefaultToPixelBridge() {
+        if (cfg.prefs.contains("setup_mode") || cfg.prefs.contains("db_password")) return;
+        cfg.setSetupMode("pixel");
+        cfg.prefs.edit().putBoolean("dcim_originals", true).apply();
+        if (checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.READ_EXTERNAL_STORAGE},
+                REQ_STORAGE_DEFAULT);
+        }
+    }
+
+    /**
      * Mostra sempre la conferma, anche se "mode" sembra già attivo: su un'installazione già esistente (il Pixel 5
      * dell'utente) il preset è dedotto da dcim_originals (vedi Cfg.setupMode()) ma prune_emergency non è mai stato
      * acceso da quella deduzione — toccare di nuovo lo stesso bottone resta il modo per far entrare anche quello.
@@ -593,11 +623,15 @@ public class MainActivity extends Activity {
         boolean pixel = "pixel".equals(mode);
         String title = pixel ? "Pixel → Google Photos bridge" : "Private photo server";
         String msg = pixel
-            ? "Turns on Keep the originals in DCIM/Immich (restarts the server and moves photos already uploaded) and "
-                + "the emergency deletion safety net below. \"Delete the original from Immich after\" is left as it is."
-            : "Turns off Keep the originals in DCIM/Immich (new photos stop moving to DCIM/Immich; ones already there "
-                + "stay where they are) and the emergency deletion safety net below. \"Delete the original from Immich "
-                + "after\" is left as it is.";
+            ? "Turns on Keep the originals in DCIM/Immich: restarts the server and moves photos already uploaded into "
+                + "shared storage, where Google Photos AND any other app on this phone can see them. Also turns on the "
+                + "emergency deletion safety net below. \"Delete the original from Immich after\" is left as it is."
+            : "Turns off Keep the originals in DCIM/Immich: new photos stop moving there. Originals already moved to "
+                + "DCIM/Immich STAY there and stay visible to Google Photos and other apps — switching back to private "
+                + "does not hide them again; move or delete them yourself if you want that. Also turns off the "
+                + "emergency deletion safety net below. \"Delete the original from Immich after\" is left as it is. If "
+                + "you still want a plain copy of your photos somewhere on this phone (for a file manager or a PC over "
+                + "USB) without sharing anything automatically, use \"Backup on the phone\" further down instead.";
         new AlertDialog.Builder(this)
             .setTitle(title)
             .setMessage(msg)
