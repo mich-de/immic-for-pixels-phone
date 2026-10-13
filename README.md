@@ -108,4 +108,6 @@ The APK bundles third-party software under its own licenses:
 proot (GPL-2.0+), libtalloc (LGPL-3.0+), libandroid-shmem (BSD-3-Clause), Debian and its packages (various),
 PostgreSQL (PostgreSQL License), VectorChord (AGPL-3.0 or ELv2), Valkey (BSD), Node.js (MIT), jellyfin-ffmpeg
 (GPL-3.0+) and Immich (AGPL-3.0). If you redistribute the APK, respect their terms, in particular the availability of
-the source code of proot and Immich: each release links the exact Immich tag, and the build scripts are here.
+the source code of proot and Immich: each release links the exact Immich tag, and the build scripts are here. The
+app's header shows [Immich's own logo](https://github.com/immich-app/immich/tree/main/design) to indicate what it
+runs; this project is unofficial and not affiliated with Immich.

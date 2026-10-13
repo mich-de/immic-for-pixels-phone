@@ -18,6 +18,7 @@ import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.RippleDrawable;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -28,6 +29,7 @@ import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.CheckBox;
 import android.widget.CompoundButton;
 import android.widget.LinearLayout;
@@ -47,10 +49,13 @@ public class MainActivity extends Activity {
     private static final int C_OK = Color.parseColor("#1B7F3B");
     private static final int C_WARN = Color.parseColor("#B26A00");
     private static final int C_ERR = Color.parseColor("#B3261E");
-    private static final int C_ACCENT = Color.parseColor("#3B4BA8");
-    private static final int C_BG = Color.parseColor("#EDF0F8");      // sfondo dietro le card
+    // Accento, sfondo e superfici: non "final", vengono risolti una volta in resolveColors() (vedi onCreate()).
+    // Su Android 12+ sono il vero colore dinamico "Material You" del telefono (stile Pixel, prende il colore dallo
+    // sfondo dell'utente); prima di Android 12, o se la risorsa non c'è, restano questi valori fissi.
+    private int C_ACCENT = Color.parseColor("#3B4BA8");
+    private int C_BG = Color.parseColor("#EDF0F8");      // sfondo dietro le card
     private static final int C_CARD = Color.parseColor("#FFFFFF");    // sfondo delle card
-    private static final int C_SURFACE = Color.parseColor("#F1F3F9"); // campi/spinner/log dentro una card
+    private int C_SURFACE = Color.parseColor("#F1F3F9"); // campi/spinner/log dentro una card
     private static final int REQ_STORAGE = 100;
     private static final int REQ_STORAGE_DCIM = 101;
     private static final int REQ_STORAGE_DEFAULT = 102;
@@ -106,6 +111,7 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle b) {
         super.onCreate(b);
         cfg = new Cfg(this);
+        resolveColors();
         maybeDefaultToPixelBridge();
         setContentView(buildUi());
         // ricreata (rotazione, ritorno dopo che Android l'ha chiusa): i comandi dell'intent sono già stati eseguiti
@@ -457,7 +463,7 @@ public class MainActivity extends Activity {
         LinearLayout c = new LinearLayout(this);
         c.setOrientation(LinearLayout.VERTICAL);
         c.setPadding(dp(16), dp(16), dp(16), dp(16));
-        c.setBackground(shape(C_CARD, 16));
+        c.setBackground(shape(C_CARD, 20));
         c.setElevation(dp(2));
         return c;
     }
@@ -471,11 +477,11 @@ public class MainActivity extends Activity {
     private void setButtonLook(Button b, boolean primary) {
         if (primary) {
             b.setTextColor(Color.WHITE);
-            b.setBackground(ripple(C_ACCENT, 12, Color.argb(90, 255, 255, 255)));
+            b.setBackground(ripple(C_ACCENT, 24, Color.argb(90, 255, 255, 255)));
         } else {
             b.setTextColor(C_ACCENT);
             int tint = Color.argb(28, Color.red(C_ACCENT), Color.green(C_ACCENT), Color.blue(C_ACCENT));
-            b.setBackground(ripple(tint, 12, Color.argb(45, 0, 0, 0)));
+            b.setBackground(ripple(tint, 24, Color.argb(45, 0, 0, 0)));
         }
     }
 
@@ -504,7 +510,7 @@ public class MainActivity extends Activity {
 
     /** sfondo tenue per spinner e campi di testo dentro una card: altrimenti sembrano incollati sul bianco */
     private void surface(View v) {
-        v.setBackground(shape(C_SURFACE, 10));
+        v.setBackground(shape(C_SURFACE, 18));
         v.setPadding(dp(12), dp(10), dp(12), dp(10));
     }
 
@@ -598,6 +604,24 @@ public class MainActivity extends Activity {
     }
 
     /**
+     * Colore dinamico "Material You" (il telefono lo calcola dallo sfondo scelto dalla persona, Android 12+): qui
+     * niente AndroidX/Compose, quindi si legge direttamente la risorsa di sistema invece del solito
+     * DynamicColors.wrapContext(). _600 è un tono pieno adatto a testo/sfondo pieno su superficie chiara; _50/_100
+     * sono le tinte quasi bianche usate per lo sfondo della pagina e le superfici (spinner, campi, log). Prima di
+     * Android 12, o se per qualche motivo la risorsa non c'è, restano i valori fissi già assegnati sopra.
+     */
+    private void resolveColors() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return;
+        try {
+            C_ACCENT = getColor(android.R.color.system_accent1_600);
+            C_BG = getColor(android.R.color.system_accent1_50);
+            C_SURFACE = getColor(android.R.color.system_accent1_100);
+        } catch (Exception ignored) {
+            // telefono/ROM senza queste risorse: restano i colori fissi
+        }
+    }
+
+    /**
      * La primissima volta che l'app viene aperta (mai stato configurato nulla: niente db_password, che Cfg crea solo
      * quando il server viene preparato almeno una volta) parte già come "Pixel bridge", lo scopo per cui esiste
      * l'app: chiede subito il permesso Memoria, così di solito è già pronto quando si preme "Install and start". Su
@@ -671,8 +695,23 @@ public class MainActivity extends Activity {
         root.setPadding(dp(16), dp(16), dp(16), dp(28));
         sv.addView(root);
 
-        root.addView(text("Immich Server", 24, C_TEXT, true));
-        root.addView(text("Your photo and video server, on this phone", 14, C_MUTED, false), lp(2));
+        LinearLayout header = new LinearLayout(this);
+        header.setOrientation(LinearLayout.HORIZONTAL);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        int logoId = getResources().getIdentifier("ic_immich_logo", "drawable", getPackageName());
+        if (logoId != 0) {
+            ImageView logo = new ImageView(this);
+            logo.setImageResource(logoId);
+            LinearLayout.LayoutParams logoLp = new LinearLayout.LayoutParams(dp(32), dp(32));
+            logoLp.rightMargin = dp(10);
+            header.addView(logo, logoLp);
+        }
+        LinearLayout titles = new LinearLayout(this);
+        titles.setOrientation(LinearLayout.VERTICAL);
+        titles.addView(text("Immich Server", 24, C_TEXT, true));
+        titles.addView(text("Your photo and video server, on this phone", 14, C_MUTED, false), lp(2));
+        header.addView(titles);
+        root.addView(header);
 
         // ---- cosa fa questo telefono: un preset che precompila le impostazioni sotto, nessuna le nasconde ----
         LinearLayout presetRow = new LinearLayout(this);
@@ -1125,7 +1164,7 @@ public class MainActivity extends Activity {
 
         logView = text("", 11, Color.parseColor("#222222"), false);
         logView.setTypeface(Typeface.MONOSPACE);
-        logView.setBackground(shape(C_SURFACE, 10));
+        logView.setBackground(shape(C_SURFACE, 18));
         logView.setPadding(dp(10), dp(10), dp(10), dp(10));
         logView.setTextIsSelectable(true);
         logsCard.addView(logView, lp(10));
