@@ -75,6 +75,7 @@ public class MainActivity extends Activity {
     private TextView pruneStatus;
     private TextView backupStatus;
     private TextView batteryStatus;
+    private TextView dnsStatus;
     private TextView dcimStatus;
     private TextView missingStatus;
     private TextView updateStatus;
@@ -1127,6 +1128,20 @@ public class MainActivity extends Activity {
                 confirmRepair();
             }
         }), lp(10));
+
+        advCard.addView(text("Network", 14, C_TEXT, true), lp(20));
+        advCard.addView(text("Some Wi-Fi routers (parental-control / access-profile filters) answer requests for "
+            + "external domain names with a wrong address instead of blocking them outright: the server still works "
+            + "on the local network, but things like checking for updates fail. If that happens here, this asks a "
+            + "public server (Google) for domain names instead of the router.", 12, C_MUTED, false), lp(4));
+        dnsStatus = text("", 12, C_MUTED, false);
+        advCard.addView(dnsStatus, lp(8));
+        advCard.addView(button("Fix it", new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                dnsDialog();
+            }
+        }), lp(6));
         root.addView(advCard, lp(14));
 
         // ---- log e diagnostica ----
@@ -1254,6 +1269,7 @@ public class MainActivity extends Activity {
 
         String us = Updater.status();
         if (us.isEmpty() && !cfg.prefs.getBoolean("update_check", true)) us = "Automatic checks are off.";
+        if (us.startsWith("Could not check for updates")) us += " If this keeps happening, see Network under Advanced.";
         updateStatus.setText("Installed: Immich " + (installedVersion.isEmpty() ? "(not yet)" : installedVersion)
             + (us.isEmpty() ? "" : "\n" + us));
         Updater.Release up = Updater.available();
@@ -1272,6 +1288,7 @@ public class MainActivity extends Activity {
         backupBtn.setText(Backup.running() ? "Stop the copy" : "Copy to the phone now");
         backupStatus.setText(Backup.status());
         batteryStatus.setText("Battery now: " + BatteryGuard.statusText(this));
+        dnsStatus.setText("Private DNS: " + Health.privateDnsText(this));
 
         String txt = currentLog();
         if (!txt.equals(lastLog)) {
@@ -1383,6 +1400,53 @@ public class MainActivity extends Activity {
                     Toast.makeText(MainActivity.this, ok ? "Done" : "Failed", Toast.LENGTH_SHORT).show();
                 }
             });
+        }
+        b.show();
+    }
+
+    private void dnsDialog() {
+        final boolean canWrite = Health.canWriteSecure(this);
+        final boolean onPublic = Health.usingPublicDns(this);
+        String msg = "Some routers block or mis-answer requests for external domain names (github.com, google.com, "
+            + "...) for specific devices, as a parental-control or access-profile filter, while still letting the "
+            + "phone reach the internet directly by IP address: checking for Immich updates (and possibly Google "
+            + "Photos backup from this phone) can fail even though the server itself works fine. Asking a public "
+            + "server for domain names instead of the router usually gets around it.\n\n"
+            + "Now: Private DNS " + Health.privateDnsText(this) + ".\n\n"
+            + "Easiest way: Settings → Network & internet → Private DNS → Private DNS provider hostname → \""
+            + Health.PUBLIC_DNS_HOST + "\".\n\n"
+            + "Or, from a PC with the phone connected:\n" + Health.dnsAdbCommands(this);
+        AlertDialog.Builder b = new AlertDialog.Builder(this)
+            .setTitle("Network")
+            .setMessage(msg)
+            .setNeutralButton("Copy adb commands", new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface d, int w) {
+                    ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+                    cm.setPrimaryClip(ClipData.newPlainText("adb", Health.dnsAdbCommands(MainActivity.this)));
+                    Toast.makeText(MainActivity.this, "Copied", Toast.LENGTH_SHORT).show();
+                }
+            })
+            .setNegativeButton("Close", null);
+        if (canWrite) {
+            if (onPublic) {
+                b.setPositiveButton("Use the Wi-Fi network's own DNS", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int w) {
+                        boolean ok = Health.clearPrivateDns(MainActivity.this);
+                        Toast.makeText(MainActivity.this, ok ? "Done" : "Failed", Toast.LENGTH_SHORT).show();
+                    }
+                });
+            } else {
+                b.setPositiveButton("Use public DNS now", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int w) {
+                        boolean ok = Health.setPublicDns(MainActivity.this, Health.PUBLIC_DNS_HOST);
+                        Toast.makeText(MainActivity.this, ok ? "Done: press Check now in Updates in a moment" : "Failed",
+                            Toast.LENGTH_LONG).show();
+                    }
+                });
+            }
         }
         b.show();
     }

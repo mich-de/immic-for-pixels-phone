@@ -21,6 +21,7 @@ Back to the [README](../README.md).
 | Photos don't appear in Google Photos | With *Keep the originals in DCIM/Immich*: in Google Photos turn on the backup of the `admin` folder. With the gallery copy: turn on the `Immich` folder. Check that Google Photos' backup is on. |
 | The same photo shows twice | In Immich: reload the page or reopen the app. In Google Photos or the gallery: it's the same photo (local original and cloud copy) — don't delete either. |
 | Running out of space | See [Storage warnings](features.md#storage-warnings). |
+| Checking for updates fails, but the server itself works fine | Some routers (parental-control / access-profile filters) answer this phone's requests for domain names like `github.com` with a wrong address instead of blocking them outright. *Advanced → Network → Fix it* asks Google's DNS directly instead of the router's. This can also silently break Google Photos' own backup from this phone, since it needs domain names too — worth checking first. |
 
 ## From a PC
 
