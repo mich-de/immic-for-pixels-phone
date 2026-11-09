@@ -271,6 +271,18 @@ final class Updater {
         PackageInstaller.Session s = null;
         boolean committed = false;
         try {
+            // i dati del rilascio si rileggono adesso: quelli del controllo di ore prima (dimensione, sha256) non valgono
+            // più se nel frattempo il rilascio è stato ricompilato (stesso URL, file diverso) e il download fallirebbe
+            // con "incomplete download" o "doesn't match its published checksum"
+            status = "Checking the latest release…";
+            try {
+                Release fresh = fetchLatest();
+                fresh.rebuild = r.rebuild || fresh.tag.equals(r.tag) && fresh.uploadedAt != r.uploadedAt;
+                r = fresh;
+                available = fresh;
+            } catch (Exception e) {
+                // GitHub non risponde all'API: si prova con i dati che c'erano, i controlli sotto restano
+            }
             status = "Downloading Immich " + r.tag + "…";
             PackageInstaller pi = ctx.getPackageManager().getPackageInstaller();
             PackageInstaller.SessionParams sp = new PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL);
