@@ -79,6 +79,9 @@ public class MainActivity extends Activity {
     private TextView dcimStatus;
     private TextView missingStatus;
     private TextView updateStatus;
+    private TextView remoteStatus;
+    /** Remote.rev quando la schermata è stata costruita: se la pagina web cambia qualcosa, si ricostruisce */
+    private long remoteRevSeen;
     private Button updateBtn;
     private String installedVersion = "";
     private Button presetPixelBtn;
@@ -114,7 +117,9 @@ public class MainActivity extends Activity {
         cfg = new Cfg(this);
         resolveColors();
         maybeDefaultToPixelBridge();
+        remoteRevSeen = Remote.rev;
         setContentView(buildUi());
+        Remote.sync(this);
         // ricreata (rotazione, ritorno dopo che Android l'ha chiusa): i comandi dell'intent sono già stati eseguiti
         if (b == null) handleIntent(getIntent());
     }
@@ -240,6 +245,11 @@ public class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         resumed = true;
+        // impostazioni cambiate dalla pagina web mentre l'app era aperta: interruttori e menu vanno rimessi a posto
+        if (remoteRevSeen != Remote.rev) {
+            recreate();
+            return;
+        }
         installedVersion = Updater.current(cfg);
         handler.post(tick);
         // nessun controllo ancora in questo processo (app appena aperta o aggiornata): uno subito, senza notifica
@@ -848,6 +858,36 @@ public class MainActivity extends Activity {
         updatesCard.addView(updRow, lp(10));
         root.addView(updatesCard, lp(14));
 
+        // ---- configurazione da remoto (vedi Remote) ----
+        LinearLayout remoteCard = card();
+        remoteCard.addView(text("Remote configuration", 16, C_TEXT, true));
+        remoteCard.addView(text("A web page to see and change these settings, start, stop and update the server from a computer "
+            + "or another phone on the same network (or your VPN). Protected by a password; plain HTTP like Immich itself, "
+            + "so don't expose its port to the Internet.", 12, C_MUTED, false), lp(6));
+        CheckBox remoteBox = new CheckBox(this);
+        remoteBox.setText("Turn on the configuration web page");
+        remoteBox.setButtonTintList(ColorStateList.valueOf(C_ACCENT));
+        remoteBox.setChecked(Remote.enabled(cfg));
+        remoteBox.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton b, boolean checked) {
+                cfg.prefs.edit().putBoolean("remote_enabled", checked).commit();
+                Remote.sync(MainActivity.this);
+            }
+        });
+        remoteCard.addView(remoteBox, lp(10));
+        remoteStatus = text("", 13, C_ACCENT, false);
+        remoteStatus.setTextIsSelectable(true);
+        remoteCard.addView(remoteStatus, lp(4));
+        remoteCard.addView(button("New password (signs everyone out)", new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Remote.regeneratePassword(cfg);
+                Toast.makeText(MainActivity.this, "New password set", Toast.LENGTH_SHORT).show();
+            }
+        }), lp(10));
+        root.addView(remoteCard, lp(14));
+
         // ---- galleria e Google Foto ----
         LinearLayout galleryCard = card();
         galleryCard.addView(text("Gallery and Google Photos", 16, C_TEXT, true));
@@ -1194,6 +1234,12 @@ public class MainActivity extends Activity {
     // ------------------------------------------------------------------ aggiornamento
 
     private void refresh() {
+        // la pagina web ha cambiato un'impostazione mentre la schermata è aperta: la si ricostruisce (se non si sta
+        // scrivendo in un campo), così interruttori e menu non mostrano valori vecchi
+        if (remoteRevSeen != Remote.rev && !(getCurrentFocus() instanceof EditText)) {
+            recreate();
+            return;
+        }
         refreshPreset();
         Stack.State s = Stack.I.state();
         boolean installed = Stack.installed(cfg);
@@ -1284,6 +1330,9 @@ public class MainActivity extends Activity {
                 Toast.makeText(this, "Android's install window didn't open: " + e.getMessage(), Toast.LENGTH_LONG).show();
             }
         }
+
+        String rs = Remote.describe(cfg);
+        if (!rs.contentEquals(remoteStatus.getText())) remoteStatus.setText(rs); // selezionabile: non ad ogni secondo
 
         backupBtn.setText(Backup.running() ? "Stop the copy" : "Copy to the phone now");
         backupStatus.setText(Backup.status());

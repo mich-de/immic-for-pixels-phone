@@ -88,6 +88,7 @@ Tutto è nell'unica schermata dell'app; dettagli e avvertenze (in inglese) in **
 | [Backup sul telefono](docs/features.md#backup-on-the-phone) | Copia tutti gli originali in una normale cartella `ImmichBackup` |
 | [Promemoria batteria](docs/features.md#battery-reminder) | Ti ricorda di staccare sopra e riattaccare sotto una certa carica |
 | [Aggiornamenti](docs/features.md#updates) | Ti avvisa quando esce una versione nuova e la installa con un tocco |
+| [Configurazione da remoto](docs/features.md#remote-configuration) | Una pagina web con password per avviare/fermare, aggiornare e configurare il server da un altro dispositivo |
 
 ## Cercasi tester
 
