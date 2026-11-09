@@ -87,6 +87,7 @@ Everything is in the app's single screen; details and caveats in **[docs/feature
 | [Backup on the phone](docs/features.md#backup-on-the-phone) | Copies all the originals to a normal `ImmichBackup` folder |
 | [Battery reminder](docs/features.md#battery-reminder) | Reminds you to unplug above and plug back in below a charge level |
 | [Updates](docs/features.md#updates) | Tells you when a new version is out and installs it with one tap |
+| [Remote configuration](docs/features.md#remote-configuration) | A password-protected web page to start/stop, update and configure the server from another device |
 
 ## Help wanted: testers
 

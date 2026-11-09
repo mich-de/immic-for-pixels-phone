@@ -53,6 +53,7 @@ public class ServerService extends Service {
         }
 
         if (ACTION_START.equals(action)) new Cfg(this).setShouldRun(true);
+        Remote.sync(this); // all'accensione (avvio automatico) l'app non si apre: la pagina web parte da qui
         NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
         nm.createNotificationChannel(new NotificationChannel(CHANNEL, "Server", NotificationManager.IMPORTANCE_LOW));
         startForeground(NID, build());
